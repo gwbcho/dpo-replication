@@ -1,5 +1,15 @@
 # Distributional Policy Optimization: Reproducing the Generative Actor Critic Algorithm
 
+
+## Objectives
+
+The paper describes a method to represent arbitrary distribution functions over a continuous action space allowing for the construction of an optimal stationary stochastic policy. Without making assumptions about the underlying distribution, their generative scheme, called Generative Actor Critic, can overcome some limitations of more traditional policy gradient methods.
+
+The purpose of this project is to reproduce Figure 4 which plots the training curves of 6 different methods on 6 DeepMind MuJoCo control suites. Reproducing this figure requires that we reproducing the entire paper as 3 variations of GAC need to be implemented and tested, while 3 previous methods have code available online.
+
+As the paper has stated, GAC is computationally more expensive than current PG methods. Therefore, we anticipate we need the most computationally powerful Google Cloud instance or equivalence, e.g. c2-standard-60 with 60 vCPUs.
+
+
 ## Project Layout
 
 The four main components of the Generative Actor Critic (GAC) Algorithm are the Actor Architecture, tne Value Network, the Critic Network, and the Delayed Actor which tracks the explorer Actor using a Polyak averaging scheme. These major componentes can be found under the gac directory while the tests to reproduce from the original paper (https://arxiv.org/pdf/1905.09855.pdf) can be found under tests.
