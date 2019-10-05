@@ -38,9 +38,4 @@ There are no current bugs.
 
 ## Contributors
 
-Gregory Cho
-Haoze Zhang
-Jiuyang Bai
-Linlin Liu
-Liu Yang
-Xingchi Yan
+Gregory Cho, Haoze Zhang, Jiuyang Bai, Linlin Liu, Liu Yang, Xingchi Yan
