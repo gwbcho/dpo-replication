@@ -11,7 +11,7 @@ The current requirements for this project are:
 - tensorflow
 - docker
 - numpy
-- mujoco - see explanation here: https://github.com/openai/mujoco-py
+- mujoco - see explanation here: https://github.com/openai/mujoco-py (still need to add this to requirements)
 - gym
 - tqdm - for tracking experiment time left
 - visdom - for visualization of the learning process
