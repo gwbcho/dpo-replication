@@ -1,14 +1,12 @@
 version: '3.1'
 
 services:
-  cluster-service:
+  gac-service:
     build:
       context: ./
       dockerfile: ./Dockerfile
     volumes:
       - ./:/usr/src/app/
-    depends_on:
-      - build-db
     environment:
       ENVIRONMENT: LOCAL_DOCKER
       PORT: 8080
