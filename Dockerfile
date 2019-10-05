@@ -13,5 +13,5 @@ COPY ./requirements.txt ./
 RUN pip install -r requirements.txt
 COPY . /usr/src/app
 
-CMD ["python", "-m", "run"]
+CMD ["python", "-m", "main"]
 CMD tail -f /dev/null
