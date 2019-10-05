@@ -26,7 +26,7 @@ Which will run the docker container in the background.
 
 Will return a list of all running docker containers.
 
-    docker exec
+    docker exec -it <image name> bash
 
 And all related commands will allow the user to effectively ssh into the docker container. More useful commands (especially commands to handle cleanup of containers, volumes, and your environment) can be found here: https://docs.docker.com/engine/reference/commandline/docker/.
 
