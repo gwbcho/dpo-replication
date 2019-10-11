@@ -2,7 +2,16 @@
 
 ## Project Layout
 
-The four main components of the Generative Actor Critic (GAC) Algorithm are the Actor Architecture, tne Value Network, the Critic Network, and the Delayed Actor which tracks the explorer Actor using a Polyak averaging scheme. These major componentes can be found under the gac directory while the tests to reproduce from the original paper (https://arxiv.org/pdf/1905.09855.pdf) can be found under tests.
+The four main components of the Generative Actor Critic (GAC) Algorithm are the Actor Architecture, tne Value Network, the Critic Network, and the Delayed Actor which tracks the explorer Actor using a Polyak averaging scheme. These major componentes can be found under the policies/gac directory while the tests and other policies to reproduce from the original paper (https://arxiv.org/pdf/1905.09855.pdf) can be found under policies/ddpg.
+
+
+## Run Commands
+
+To run this project use the command
+
+    python3 -m main
+
+from the main directory.
 
 
 ## Requirements
