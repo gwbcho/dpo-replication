@@ -1,4 +1,4 @@
 import numpy as np
 import tensorflow as tf
 
-import gac
+import policies.gac as gac
