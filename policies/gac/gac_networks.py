@@ -15,12 +15,33 @@ classes, if for no other reason than legibility.
 
 
 class CosineBasisLinear(tf.keras.Model):
-    def __init__(self, n_basis_functions, out_size):
+    def __init__(self, n_basis_functions, out_size, activation = None):
+        """
+        Parametrize the embeding function using Fourier series up to n_basis_functions terms
+        Class Args:
+            n_basis_functions (int): the number of basis functions
+            out_size (int): the dimensionality of embedding
+            activation: activation function before output
+        """
         super(CosineBasisLinear, self).__init__()
-        pass
+        self.act_linear = tf.keras.layers.Dense(out_size, activation = activation,
+                                                      input_shape = (n_basis_functions,))
+        self.n_basis_functions = n_basis_functions
+        self.out_size = out_size
 
     def forward(self, x):
-        pass
+        """
+        Args:
+            x: tensor (batch_size_1, batch_size_2): one of the action components. batch_size_1
+            and batch_size_2 correspond to the batch size of states (N) and actions per state (K)
+        Return:
+            out: tensor (batch_size_1, batch_size_2, out_size): the embedding vector phi(x).
+        """
+        batch_size = x.shape[0]
+        h = helpers.cosine_basis_functions(x, self.n_basis_functions)
+        out = self.act_linear(h)
+        out = tf.reshape(out, (batch_size, -1, self.out_size))
+        return out
 
 
 class AutoRegressiveStochasticActor(tf.Module):
@@ -140,11 +161,48 @@ class AutoRegressiveStochasticActor(tf.Module):
 
 class StochasticActor(tf.keras.Model):
     def __init__(self, num_inputs, action_dim, n_basis_functions):
-        super(StochasticActor, self).__init__()
+        """
+        the stochasitc action generator.
 
+        Class Args:
+            num_inputs (int): number of inputs used for state embedding
+            action_dim (int): the dimensionality of the action vector
+            n_basis_functions (int): the number of basis functions
+        """
+        super(StochasticActor, self).__init__()
+        hidden_size = int(400 / action_dim)
+        self.hidden_size = hidden_size
+        self.action_dim = action_dim
+        self.l1 = tf.keras.layers.Dense(self.hidden_size * self.action_dim, 
+                                                activation=tf.keras.layers.LeakyReLU(alpha=0.1),
+                                                input_shape = (num_inputs,))
+        self.phi = CosineBasisLinear(n_basis_functions, self.hidden_size, 
+                                                activation= tf.keras.layers.LeakyReLU(alpha=0.1))
+        self.l2 = tf.keras.layers.Dense(200,    
+                                                activation= tf.keras.layers.LeakyReLU(alpha=0.1),
+                                                input_shape = (self.hidden_size * self.action_dim,))
+        self.l3 = tf.keras.layers.Dense(self.action_dim, 
+                                                activation= tf.nn.tanh,
+                                                input_shape = (200,))
 
     def forward(self, state, taus, actions):
-        pass
+        """
+        TODO still not sure about the tensor size.
+        Args:
+            state: tensor (batch_size, num_inputs)
+            taus:
+            actions:
+        Return:
+            next_actions:
+        """
+        state_embedding = self.l1(state)
+        noise_embedding = self.phi(taus)
+        noise_embedding = tf.reshape(noise_embedding, (-1, self.hidden_size * self.action_dim))
+        hadamard_product = state_embedding * noise_embedding
+        l2 = self.l2(hadamard_product)
+        next_actions = self.l3(l2)
+
+        return next_actions
 
 
 class Critic(tf.keras.Model):
