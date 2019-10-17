@@ -1,3 +1,4 @@
+import os
 import argparse
 
 import numpy as np
@@ -53,8 +54,17 @@ def create_argument_parser():
             help='Boltzman Temperature for normalizing actions')
     return parser
 
+def train_one_step(args):
+
+def train(args):
+    for t in range(args.train_steps):
+        train_one_step()
+
+
+
 def main():
     args = create_argument_parser().parse_args()
+    train(args)
 
 if __name__ == '__main__':
     main()
