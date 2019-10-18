@@ -67,7 +67,9 @@ class AutoRegressiveStochasticActor(tf.Module):
             actions (tf.Variable): set of previous actions
         """
         if actions is not None:
-            return self.supervised_forward(state, taus, actions)
+            # if the actions are defined then we use the supervised forward method which generates
+            # actions based on the provided sequence
+            return self._supervised_forward(state, taus, actions)
         batch_size = state.shape[0]
         # batch x 1 x 400
         state_embedding = tf.expand_dims(self.state_embedding(state), 1)
@@ -80,6 +82,8 @@ class AutoRegressiveStochasticActor(tf.Module):
         action = tf.zeros(batch_size, 1)
         hidden_state = None
 
+        # If the prior actions are not provided then we generate the action vector dimension by
+        # dimension. Note that the actions are in the domain [0, 1] (Why? I dunno).
         for idx in range(self.action_dim):
             # batch x 1 x 400
             action_embedding = self.action_embedding(tf.reshape(action, (batch_size, 1, 1)))
@@ -97,7 +101,20 @@ class AutoRegressiveStochasticActor(tf.Module):
         actions = tf.squeeze(tf.stack(action_list, dim=1), -1)
         return actions
 
-    def supervised_forward(self, state, taus, actions):
+    def _supervised_forward(self, state, taus, actions):
+        """
+        Private function to conduct a supervised forward call. This is relying on the assumption
+        actions are not independent to each other. With this assumption of "autocorrelation" between
+        action dimensions, this function creates a new action vector using prior actions as input.
+
+        Args:
+            state (tf.Variable(array)): state vector representation
+            taus (tf.Variable(array)): noise vector
+            actions (tf.Variable(array)): actions vector (batch x action dim)
+
+        Returns:
+            a action vector of size (batch x action dim)
+        """
         # batch x action dim x 400
         state_embedding = tf.unsqueeze(tf.nn.leaky_relu(self.state_embedding(state)), 1)
         # batch x action dim x 400
@@ -114,6 +131,7 @@ class AutoRegressiveStochasticActor(tf.Module):
         # take the element wise product of these vectors
         hadamard_product = tf.mul(gru_out, noise_embedding)
         actions = self.dense_layer_2(self.dense_layer_1(hadamard_product))
+        # batch x action dim
         return tf.squeeze(actions, -1)
 
 
