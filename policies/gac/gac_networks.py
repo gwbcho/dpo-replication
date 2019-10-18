@@ -119,7 +119,7 @@ class AutoRegressiveStochasticActor(tf.Module):
             a action vector of size (batch x action dim)
         """
         # batch x action dim x 400
-        state_embedding = tf.unsqueeze(tf.nn.leaky_relu(self.state_embedding(state)), 1)
+        state_embedding = tf.expand_dims(tf.nn.leaky_relu(self.state_embedding(state)), 1)
         # batch x action dim x 400
         shifted_actions = tf.zeros_like(actions)
         shifted_actions[:, 1:] = actions[:, :-1]
@@ -132,7 +132,7 @@ class AutoRegressiveStochasticActor(tf.Module):
         noise_embedding = self.noise_embedding(taus)
         # batch x action dim x 400
         # take the element wise product of these vectors
-        hadamard_product = tf.mul(gru_out, noise_embedding)
+        hadamard_product = gru_out * noise_embedding
         actions = self.dense_layer_2(self.dense_layer_1(hadamard_product))
         # batch x action dim
         return tf.squeeze(actions, -1)
