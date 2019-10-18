@@ -90,7 +90,7 @@ class AutoRegressiveStochasticActor(tf.Module):
         for idx in range(self.action_dim):
             # batch x 1 x 400
             action_embedding = self.action_embedding(tf.reshape(action, (batch_size, 1, 1)))
-            rnn_input = tf.concat([state_embedding, action_embedding], dim=2)
+            rnn_input = tf.concat([state_embedding, action_embedding], axis=2)
             # Note that the RNN states encode the function approximation for the conditional
             # probability of the ordered sequence of vectors in d dimension space. Effectively,
             # the researchers claim that each variable in the d dimension vector are autocorrelated.
@@ -101,7 +101,7 @@ class AutoRegressiveStochasticActor(tf.Module):
             action = self.dense_layer_2(self.dense_layer_1(hadamard_product))
             action_list.append(action)
 
-        actions = tf.squeeze(tf.stack(action_list, dim=1), -1)
+        actions = tf.squeeze(tf.stack(action_list, axis=1), -1)
         return actions
 
     def _supervised_forward(self, state, taus, actions):
@@ -125,7 +125,7 @@ class AutoRegressiveStochasticActor(tf.Module):
         shifted_actions[:, 1:] = actions[:, :-1]
         provided_action_embedding = self.action_embedding(shifted_actions)
 
-        rnn_input = tf.concat([state_embedding, provided_action_embedding], dim=2)
+        rnn_input = tf.concat([state_embedding, provided_action_embedding], axis=2)
         gru_out, _ = self.rnn(rnn_input)
 
         # batch x action dim x 400
