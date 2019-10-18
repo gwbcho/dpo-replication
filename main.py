@@ -54,12 +54,28 @@ def create_argument_parser():
             help='Boltzman Temperature for normalizing actions')
     return parser
 
+def evaluate_policy(policy, env, episodes):
+    """
+    Run the environment env using policy for episodes number of times.
+    Return: average rewards per episode.
+    """
+    total_reward = 0.0
+    for _ in range(episodes):
+        state = env.reset()
+        while True:
+            action = policy.act(state)
+            state, reward, is_terminal, _ = env.step(action)
+            total_reward += reward
+            if is_terminal:
+                break
+    return total_reward / episodes
+
 def train_one_step(args):
     pass
 
 def train(args):
     for t in range(args.train_steps):
-        train_one_step()
+        train_one_step(args)
 
 
 
