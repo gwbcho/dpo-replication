@@ -65,6 +65,9 @@ class AutoRegressiveStochasticActor(tf.Module):
             state (tf.Variable): state vector containing a state with the format R^num_inputs
             taus (tf.Variable): randomly sampled noise vector for sampling purposes
             actions (tf.Variable): set of previous actions
+
+        Returns:
+            actions vector
         """
         if actions is not None:
             # if the actions are defined then we use the supervised forward method which generates
