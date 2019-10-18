@@ -97,7 +97,7 @@ class AutoRegressiveStochasticActor(tf.Module):
             gru_out, hidden_state = self.rnn(rnn_input, hidden_state)
 
             # batch x 400
-            hadamard_product = tf.mul(tf.squeeze(gru_out, 1), noise_embedding[:, idx, :])
+            hadamard_product = tf.squeeze(gru_out, 1) * noise_embedding[:, idx, :]
             action = self.dense_layer_2(self.dense_layer_1(hadamard_product))
             action_list.append(action)
 
