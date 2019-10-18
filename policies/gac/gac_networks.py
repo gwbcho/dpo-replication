@@ -14,7 +14,7 @@ classes, if for no other reason than legibility.
 """
 
 
-class CosineBasisLinear(tf.keras.Model):
+class CosineBasisLinear(tf.Module):
     def __init__(self, n_basis_functions, out_size, activation = None):
         """
         Parametrize the embeding function using Fourier series up to n_basis_functions terms
@@ -29,7 +29,7 @@ class CosineBasisLinear(tf.keras.Model):
         self.n_basis_functions = n_basis_functions
         self.out_size = out_size
 
-    def forward(self, x):
+    def __call__(self, x):
         """
         Args:
             x: tensor (batch_size_1, batch_size_2): one of the action components. batch_size_1
@@ -159,7 +159,7 @@ class AutoRegressiveStochasticActor(tf.Module):
         return tf.squeeze(actions, -1)
 
 
-class StochasticActor(tf.keras.Model):
+class StochasticActor(tf.Module):
     def __init__(self, num_inputs, action_dim, n_basis_functions):
         """
         the stochasitc action generator.
@@ -185,7 +185,7 @@ class StochasticActor(tf.keras.Model):
                                                 activation= tf.nn.tanh,
                                                 input_shape = (200,))
 
-    def forward(self, state, taus, actions):
+    def __call__(self, state, taus, actions):
         """
         TODO still not sure about the tensor size.
         Args:
