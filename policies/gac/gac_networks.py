@@ -54,6 +54,11 @@ class StochasticActor(tf.keras.Model):
 
 
 class Critic(tf.keras.Model):
+    '''
+    The Critic class create one or two critic networks, which take states as input and return the value of those states 
+    num_inputs: number of states
+    num_networks: number of critc networks need to be created
+    '''
     def __init__(self, num_inputs, num_networks=1):
         super(Critic, self).__init__()
         self.input = tf.placeholder(tf.float32, [num_input])
