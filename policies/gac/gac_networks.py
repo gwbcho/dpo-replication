@@ -55,9 +55,13 @@ class StochasticActor(tf.keras.Model):
 
 class Critic(tf.keras.Model):
     '''
-    The Critic class create one or two critic networks, which take states as input and return the value of those states 
-    num_inputs: number of states
-    num_networks: number of critc networks need to be created
+    The Critic class create one or two critic networks, which take states as input and return 
+    the value of those states. The critic has two hidden layers and an output layer with size
+    400, 300, and 1. All are fully connected layers.
+    
+    Class Args:
+    num_inputs (int): number of states
+    num_networks (int): number of critc networks need to be created
     '''
     def __init__(self, num_inputs, num_networks=1):
         super(Critic, self).__init__()
@@ -81,9 +85,9 @@ class Critic(tf.keras.Model):
     def __call__(self, x):
     # This function returns the value of the forward path given input x
         if self.num_networks == 1:
-            return self.session.run(self.q1, feed_dict={input:x})
+            return self.session.run(self.q1, feed_dict={self.input:x})
         else:
-            return self.session.run([self.q1, self.q2], feed_dict={input:x})
+            return self.session.run([self.q1, self.q2], feed_dict={self.input:x})
 
 class Value(tf.keras.Model):
     def __init__(self, num_inputs, num_networks=1):
