@@ -24,8 +24,10 @@ class CosineBasisLinear(tf.Module):
             activation: activation function before output
         """
         super(CosineBasisLinear, self).__init__()
-        self.act_linear = tf.keras.layers.Dense(out_size, activation = activation,
-                                                      input_shape = (n_basis_functions,))
+        self.act_linear = tf.keras.layers.Dense(
+            out_size, activation = activation,
+            input_shape = (n_basis_functions,)
+        )
         self.n_basis_functions = n_basis_functions
         self.out_size = out_size
 
@@ -173,17 +175,26 @@ class StochasticActor(tf.Module):
         hidden_size = int(400 / action_dim)
         self.hidden_size = hidden_size
         self.action_dim = action_dim
-        self.l1 = tf.keras.layers.Dense(self.hidden_size * self.action_dim, 
-                                                activation=tf.keras.layers.LeakyReLU(alpha=0.01),
-                                                input_shape = (num_inputs,))
-        self.phi = CosineBasisLinear(n_basis_functions, self.hidden_size, 
-                                                activation= tf.keras.layers.LeakyReLU(alpha=0.01))
-        self.l2 = tf.keras.layers.Dense(200,    
-                                                activation= tf.keras.layers.LeakyReLU(alpha=0.01),
-                                                input_shape = (self.hidden_size * self.action_dim,))
-        self.l3 = tf.keras.layers.Dense(self.action_dim, 
-                                                activation= tf.nn.tanh,
-                                                input_shape = (200,))
+        self.l1 = tf.keras.layers.Dense(
+            self.hidden_size * self.action_dim,
+            activation=tf.keras.layers.LeakyReLU(alpha=0.01),
+            input_shape = (num_inputs,)
+        )
+        self.phi = CosineBasisLinear(
+            n_basis_functions,
+            self.hidden_size,
+            activation= tf.keras.layers.LeakyReLU(alpha=0.01)
+        )
+        self.l2 = tf.keras.layers.Dense(
+            200,
+            activation= tf.keras.layers.LeakyReLU(alpha=0.01),
+            input_shape = (self.hidden_size * self.action_dim,)
+        )
+        self.l3 = tf.keras.layers.Dense(
+            self.action_dim,
+            activation= tf.nn.tanh,
+            input_shape = (200,)
+        )
 
     def __call__(self, state, taus, actions):
         """
@@ -207,10 +218,10 @@ class StochasticActor(tf.Module):
 
 class Critic(tf.keras.Model):
     '''
-    The Critic class create one or two critic networks, which take states as input and return 
+    The Critic class create one or two critic networks, which take states as input and return
     the value of those states. The critic has two hidden layers and an output layer with size
     400, 300, and 1. All are fully connected layers.
-    
+
     Class Args:
     num_inputs (int): number of states
     num_networks (int): number of critc networks need to be created
@@ -227,13 +238,13 @@ class Critic(tf.keras.Model):
         # create a session for execution of the graph
         self.session = tf.Session()
         self.session.run(tf.global_variables_initializer())
-        
+
     def build(self):
     # A helper function for building the graph
         out1 = tf.keras.layers.dense(self.input, units=400, activation=tf.nn.leaky_relu)
         out2 = tf.keras.layers.dense(out1, units=300, activation=tf.nn.leaky_relu)
         return tf.keras.layers.dense(out2, units=1)
-    
+
     def __call__(self, x):
     # This function returns the value of the forward path given input x
         if self.num_networks == 1:
