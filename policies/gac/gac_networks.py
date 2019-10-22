@@ -63,7 +63,6 @@ class AutoRegressiveStochasticActor(tf.Module):
         self.action_dim = action_dim
         self.state_embedding = tf.keras.layers.Dense(
             400,  # as specified by the architecture in the paper and in their code
-            input_shape=(num_inputs,),
             activation=tf.nn.leaky_relu
         )
         # use the cosine basis linear classes to "embed" the inputted values to a set dimension
@@ -72,7 +71,7 @@ class AutoRegressiveStochasticActor(tf.Module):
         self.action_embedding = CosineBasisLinear(n_basis_functions, 400)
 
         # construct the GRU to ensure autoregressive qualities of our samples
-        self.rnn = tf.keras.layers.GRU(400, batch_first=True)
+        self.rnn = tf.keras.layers.GRU(400, return_state=True, return_sequences=True)
         # post processing linear layers
         self.dense_layer_1 = tf.keras.layers.Dense(400, activation=tf.nn.leaky_relu)
         # output layer (produces the sample from the implicit quantile function)
@@ -86,7 +85,8 @@ class AutoRegressiveStochasticActor(tf.Module):
 
         Args:
             state (tf.Variable): state vector containing a state with the format R^num_inputs
-            taus (tf.Variable): randomly sampled noise vector for sampling purposes
+            taus (tf.Variable): randomly sampled noise vector for sampling purposes. This vector
+                should be of shape (batch_size x actor_dimension x some other dimension?)
             actions (tf.Variable): set of previous actions
 
         Returns:
