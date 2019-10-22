@@ -174,12 +174,12 @@ class StochasticActor(tf.Module):
         self.hidden_size = hidden_size
         self.action_dim = action_dim
         self.l1 = tf.keras.layers.Dense(self.hidden_size * self.action_dim, 
-                                                activation=tf.keras.layers.LeakyReLU(alpha=0.1),
+                                                activation=tf.keras.layers.LeakyReLU(alpha=0.01),
                                                 input_shape = (num_inputs,))
         self.phi = CosineBasisLinear(n_basis_functions, self.hidden_size, 
-                                                activation= tf.keras.layers.LeakyReLU(alpha=0.1))
+                                                activation= tf.keras.layers.LeakyReLU(alpha=0.01))
         self.l2 = tf.keras.layers.Dense(200,    
-                                                activation= tf.keras.layers.LeakyReLU(alpha=0.1),
+                                                activation= tf.keras.layers.LeakyReLU(alpha=0.01),
                                                 input_shape = (self.hidden_size * self.action_dim,))
         self.l3 = tf.keras.layers.Dense(self.action_dim, 
                                                 activation= tf.nn.tanh,
