@@ -141,11 +141,21 @@ class AutoRegressiveStochasticActor(tf.Module):
         Returns:
             a action vector of size (batch x action dim)
         """
+        # F.leaky_relu(self.state_embedding(state)).unsqueeze(1).expand(-1, self.action_dim, -1)
         # batch x action dim x 400
         state_embedding = tf.expand_dims(tf.nn.leaky_relu(self.state_embedding(state)), 1)
+        state_embedding = tf.broadcast_to(
+            state_embedding,
+            (
+                state_embedding.shape[0],
+                self.action_dim,
+                state_embedding.shape[2]
+            )
+        )
         # batch x action dim x 400
-        shifted_actions = tf.zeros_like(actions)
-        shifted_actions[:, 1:] = actions[:, :-1]
+        shifted_actions = tf.Variable(tf.zeros_like(actions))
+        # assign shifted actions
+        shifted_actions = shifted_actions[:, 1:].assign(actions[:, :-1])
         provided_action_embedding = self.action_embedding(shifted_actions)
 
         rnn_input = tf.concat([state_embedding, provided_action_embedding], axis=2)
