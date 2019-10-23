@@ -101,8 +101,6 @@ class AutoRegressiveStochasticActor(tf.Module):
         state_embedding = tf.expand_dims(self.state_embedding(state), 1)
         # batch x action dim x 400
         noise_embedding = self.noise_embedding(taus)
-        print(noise_embedding.shape)
-        print(self.action_dim)
 
         action_list = []
 
