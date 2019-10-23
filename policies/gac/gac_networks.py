@@ -54,7 +54,7 @@ class AutoRegressiveStochasticActor(tf.Module):
         the recurrent network used.
 
         Class Args:
-            num_inputs (int): number of inputs used for state embedding, I think this is batch size?
+            num_inputs (int): number of inputs used for state embedding, I think this is state dim?
             action_dim (int): the dimensionality of the action vector
             n_basis_functions (int): the number of basis functions
         """
@@ -86,7 +86,7 @@ class AutoRegressiveStochasticActor(tf.Module):
         Args:
             state (tf.Variable): state vector containing a state with the format R^num_inputs
             taus (tf.Variable): randomly sampled noise vector for sampling purposes. This vector
-                should be of shape (batch_size x actor_dimension x num_inputs?)
+                should be of shape (batch_size x actor_dimension x 1)
             actions (tf.Variable): set of previous actions
 
         Returns:
@@ -143,11 +143,21 @@ class AutoRegressiveStochasticActor(tf.Module):
         Returns:
             a action vector of size (batch x action dim)
         """
+        # F.leaky_relu(self.state_embedding(state)).unsqueeze(1).expand(-1, self.action_dim, -1)
         # batch x action dim x 400
         state_embedding = tf.expand_dims(tf.nn.leaky_relu(self.state_embedding(state)), 1)
+        state_embedding = tf.broadcast_to(
+            state_embedding,
+            (
+                state_embedding.shape[0],
+                self.action_dim,
+                state_embedding.shape[2]
+            )
+        )
         # batch x action dim x 400
-        shifted_actions = tf.zeros_like(actions)
-        shifted_actions[:, 1:] = actions[:, :-1]
+        shifted_actions = tf.Variable(tf.zeros_like(actions))
+        # assign shifted actions
+        shifted_actions = shifted_actions[:, 1:].assign(actions[:, :-1])
         provided_action_embedding = self.action_embedding(shifted_actions)
 
         rnn_input = tf.concat([state_embedding, provided_action_embedding], axis=2)
@@ -218,7 +228,7 @@ class StochasticActor(tf.Module):
         return next_actions
 
 
-class Critic(tf.keras.Model):
+class Critic(tf.Module):
     '''
     The Critic class create one or two critic networks, which take states as input and return
     the value of those states. The critic has two hidden layers and an output layer with size
@@ -242,18 +252,18 @@ class Critic(tf.keras.Model):
         self.session.run(tf.global_variables_initializer())
 
     def build(self):
-    # A helper function for building the graph
+        # A helper function for building the graph
         out1 = tf.keras.layers.dense(self.input, units=400, activation=tf.nn.leaky_relu)
         out2 = tf.keras.layers.dense(out1, units=300, activation=tf.nn.leaky_relu)
         return tf.keras.layers.dense(out2, units=1)
 
     def __call__(self, x):
-    # This function returns the value of the forward path given input x
+        # This function returns the value of the forward path given input x
         if self.num_networks == 1:
             return self.session.run(self.q1, feed_dict={self.input:x})
         else:
             return self.session.run([self.q1, self.q2], feed_dict={self.input:x})
 
-class Value(tf.keras.Model):
+class Value(tf.Module):
     def __init__(self, num_inputs, num_networks=1):
         super(Value, self).__init__()

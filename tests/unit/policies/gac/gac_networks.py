@@ -31,7 +31,34 @@ class TestGacNetworks(unittest.TestCase):
         batch_size_1 = 1
         num_inputs = 10
         action_dim = 5
-        state_dim = 1
+        n_basis_functions = 64
+        # construct the autoregressive stochasitc actor for testing
+        actor = gac_networks.AutoRegressiveStochasticActor(
+            num_inputs,
+            action_dim,
+            n_basis_functions
+        )
+        # taus and actions are column vectors
+        state = tf.Variable(
+            tf.random.normal(
+                [batch_size_1, num_inputs],
+                stddev=.1,
+                dtype=tf.float32
+            )
+        )
+        taus = tf.Variable(
+            tf.random.uniform(
+                [batch_size_1, action_dim, 1]
+            )
+        )
+        action = actor(state, taus)
+        self.assertEqual(action.shape[0], batch_size_1)
+        self.assertEqual(action.shape[1], action_dim)
+
+    def test_autoregressive_stochastic_actor_with_action(self):
+        batch_size_1 = 10
+        num_inputs = 20
+        action_dim = 5
         n_basis_functions = 64
         # construct the autoregressive stochasitc actor for testing
         actor = gac_networks.AutoRegressiveStochasticActor(
@@ -41,18 +68,25 @@ class TestGacNetworks(unittest.TestCase):
         )
         state = tf.Variable(
             tf.random.normal(
-                [num_inputs, state_dim],
+                [batch_size_1, num_inputs],
                 stddev=.1,
                 dtype=tf.float32
             )
         )
-        # WHY????
+        # taus and actions are column vectors
         taus = tf.Variable(
             tf.random.uniform(
-                [batch_size_1, action_dim, num_inputs]
+                [batch_size_1, action_dim, 1]
             )
         )
-        action = actor(state, taus)
+        prev_action = tf.Variable(
+            tf.random.uniform(
+                [batch_size_1, action_dim, 1]
+            )
+        )
+        action = actor(state, taus, prev_action)
+        self.assertEqual(action.shape[0], batch_size_1)
+        self.assertEqual(action.shape[1], action_dim)
 
 
 if __name__ == '__main__':
