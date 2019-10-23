@@ -38,9 +38,10 @@ class TestGacNetworks(unittest.TestCase):
             action_dim,
             n_basis_functions
         )
+        # taus and actions are column vectors
         state = tf.Variable(
             tf.random.normal(
-                [num_inputs, num_inputs],
+                [batch_size_1, num_inputs],
                 stddev=.1,
                 dtype=tf.float32
             )
@@ -51,6 +52,8 @@ class TestGacNetworks(unittest.TestCase):
             )
         )
         action = actor(state, taus)
+        self.assertEqual(action.shape[0], batch_size_1)
+        self.assertEqual(action.shape[1], action_dim)
 
     def test_autoregressive_stochastic_actor_with_action(self):
         batch_size_1 = 10
@@ -70,6 +73,7 @@ class TestGacNetworks(unittest.TestCase):
                 dtype=tf.float32
             )
         )
+        # taus and actions are column vectors
         taus = tf.Variable(
             tf.random.uniform(
                 [batch_size_1, action_dim, 1]
@@ -81,6 +85,8 @@ class TestGacNetworks(unittest.TestCase):
             )
         )
         action = actor(state, taus, prev_action)
+        self.assertEqual(action.shape[0], batch_size_1)
+        self.assertEqual(action.shape[1], action_dim)
 
 
 if __name__ == '__main__':
