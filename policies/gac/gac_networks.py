@@ -2,7 +2,7 @@
 import tensorflow as tf
 
 # import internal dependencies
-import gac_helpers.helpers as helpers
+import policies.gac.gac_helpers.helpers as helpers
 
 """
 File Description:
