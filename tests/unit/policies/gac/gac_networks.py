@@ -49,7 +49,7 @@ class TestGacNetworks(unittest.TestCase):
         # WHY????
         taus = tf.Variable(
             tf.random.uniform(
-                [batch_size_1, action_dim, num_inputs]
+                [batch_size_1, action_dim, 1]
             )
         )
         action = actor(state, taus)
