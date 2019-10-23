@@ -54,7 +54,7 @@ class AutoRegressiveStochasticActor(tf.Module):
         the recurrent network used.
 
         Class Args:
-            num_inputs (int): number of inputs used for state embedding, I think this is batch size?
+            num_inputs (int): number of inputs used for state embedding, I think this is state dim?
             action_dim (int): the dimensionality of the action vector
             n_basis_functions (int): the number of basis functions
         """
