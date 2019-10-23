@@ -1,3 +1,4 @@
-*.swp
-*.pyc
-*.json
+**/*.swp
+**/*.pyc
+**/*.json
+**/.DS_Store

@@ -2,6 +2,7 @@
 import os
 import random
 from collections import namedtuple
+import tensorflow as tf
 
 """
 A transition is made of state, action, reward, state', is_terminal.
@@ -44,3 +45,27 @@ class Replay():
     
     def __len__(self):
         return len(self.buffer)
+
+
+class ActionSampler():
+    """
+    Sampling actions from a given actor by feeding samples from a uniform distribution into the
+    actor network.
+    """
+
+    def __init__(self, action_dim):
+        self.dim = action_dim
+
+    def get_actions(self, actor, state, actions):
+        """
+        Actions are obtained from the actor network.
+        """
+        if state.shape.rank > 1:
+            batch_size = state.shape[0]
+        else:
+            batch_size = 1
+        return actor(
+                state,
+                tf.random.uniform((batch_size, self.dim), minval=0.0, maxval=1.0),
+                actions
+                )
