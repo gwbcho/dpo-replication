@@ -262,6 +262,22 @@ class Critic(tf.Module):
         else:
             return self.session.run([self.q1, self.q2], feed_dict={self.input:x})
 
-class Value(tf.Module):
+
+class Value(Critic):
+
+    """
+    Value network has the same architecture as Critic
+    """
+    
     def __init__(self, num_inputs, num_networks=1):
         super(Value, self).__init__()
+
+    def train(self, transitions, action_sampler, actor):
+
+        """
+        transition is of type named tuple policies.policy_helpers.helpers.Transition
+        action_sampler is of type policies.policy_helpers.helpers.ActionSampler
+        """
+
+        actions = action_sampler.get_actions(actor, transitions.s)
+
