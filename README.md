@@ -57,6 +57,13 @@ Will return a list of all running docker containers.
 And all related commands will allow the user to effectively ssh into the docker container. More useful commands (especially commands to handle cleanup of containers, volumes, and your environment) can be found here: https://docs.docker.com/engine/reference/commandline/docker/.
 
 
+## Project Tests
+
+To run the tests in the tests file (currently there are only functional tests) use the following command from the home directory.
+
+    python3 -m tests.unit.unit_test_suites
+
+
 ## Current Bugs
 
 There are no current bugs.
@@ -64,4 +71,4 @@ There are no current bugs.
 
 ## Contributors
 
-Gregory Cho, Haoze Zhang, Jiuyang Bai, Linlin Liu, Liu Yang, Xingchi Yan
+Gregory Cho, Jiuyang Bai, Linlin Liu, Liu Yang, Xingchi Yan
