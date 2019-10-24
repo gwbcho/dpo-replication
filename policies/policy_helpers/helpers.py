@@ -10,9 +10,9 @@ is_terminal flags if state is a terminal state, in which case this
 transition should not be counted when calculating reward.
 """
 Transition = namedtuple(
-        'Transition',
-        ['s', 'a', 'r', 'sp', 'is_terminal']
-        )
+    'Transition',
+    ['s', 'a', 'r', 'sp', 'is_terminal']
+)
 
 """
 File Description:
@@ -42,7 +42,7 @@ class Replay():
 
     def sample(self, n):
         return random.sample(self.buffer, n)
-    
+
     def __len__(self):
         return len(self.buffer)
 
@@ -65,7 +65,7 @@ class ActionSampler():
         else:
             batch_size = 1
         return actor(
-                state,
-                tf.random.uniform((batch_size, self.dim), minval=0.0, maxval=1.0),
-                actions
-                )
+            state,
+            tf.random.uniform((batch_size, self.dim), minval=0.0, maxval=1.0),
+            actions
+        )
