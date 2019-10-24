@@ -262,6 +262,61 @@ class Critic(tf.Module):
         else:
             return self.session.run([self.q1, self.q2], feed_dict={self.input:x})
 
-class Value(tf.Module):
+
+class Value(Critic):
+
+    """
+    Value network has the same architecture as Critic
+    """
+    
     def __init__(self, num_inputs, num_networks=1):
         super(Value, self).__init__()
+
+    def train_op(self, transitions, action_sampler, actor, critic, K):
+        """
+        transition is of type named tuple policies.policy_helpers.helpers.Transition
+        action_sampler is of type policies.policy_helpers.helpers.ActionSampler
+        """
+
+        """Each state needs K action samples"""
+        # batch size x 1 x state dim
+        states = tf.expand_dims(transitions.s, 1)
+        # batch size x K x state dim
+        states = tf.broadcast_to(states, [states.shape[0], K] + states.shape[1:])
+
+        """
+        Line 13 of Algorithm 2.
+        Sample actions from the actor network given current state and tau ~ U[0,1].
+        """
+        actions = action_sampler.get_actions(actor, states)
+
+        """
+        Line 14 of Algorithm 2.
+        Get the Q value of the states and action samples.
+        """
+        Q1, Q2 = critic(
+                tf.concat([states, actions], -1)
+                )
+
+        """
+        Line 14 of Algorithm 2.
+        Sum over all action samples for Q1, Q2 and take the minimum.
+        """
+        v1 = tf.reduce_sum(Q1, 1, keepdims=True)
+        v2 = tf.reduce_sum(Q2, 1, keepdims=True)
+        v_true = tf.reduce_min(
+                tf.concat([v1, v2], 1),
+                1,
+                )
+
+        """
+        Line 15 of Algorithm 2.
+        Get value of current state from the Value network.
+        Loss is MSE.
+        """
+        v_pred = self(transitions.s)
+        loss = tf.keras.losses.MSE(v_true, v_pred)
+        adam = tf.keras.optimizers.Adam(learning_rate=1e-3)
+        vars = self.trainable_variables
+        grads = adam.get_gradients(loss, vars)
+        return adam.apply_gradients(list(zip(grads, vars)))
