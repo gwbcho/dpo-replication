@@ -42,7 +42,7 @@ class Replay():
 
     def sample(self, n):
         return random.sample(self.buffer, n)
-    
+
     def __len__(self):
         return len(self.buffer)
 
@@ -65,7 +65,7 @@ class ActionSampler():
         else:
             batch_size = 1
         return actor(
-                state,
-                tf.random.uniform((batch_size, self.dim), minval=0.0, maxval=1.0),
-                actions
-                )
+            state,
+            tf.random.uniform((batch_size, self.dim), minval=0.0, maxval=1.0),
+            actions
+        )
