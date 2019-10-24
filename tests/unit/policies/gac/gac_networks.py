@@ -88,6 +88,55 @@ class TestGacNetworks(unittest.TestCase):
         self.assertEqual(action.shape[0], batch_size_1)
         self.assertEqual(action.shape[1], action_dim)
 
+    def test_stochastic_actor(self):
+        batch_size_1 = 10
+        num_inputs = 20
+        action_dim = 5
+        n_basis_functions = 64
+        # construct the autoregressive stochasitc actor for testing
+        actor = gac_networks.StochasticActor(
+            num_inputs,
+            action_dim,
+            n_basis_functions
+        )
+        state = tf.Variable(
+            tf.random.normal(
+                [batch_size_1, num_inputs],
+                stddev=.1,
+                dtype=tf.float32
+            )
+        )
+        # taus and actions are column vectors
+        taus = tf.Variable(
+            tf.random.uniform(
+                [batch_size_1, action_dim, 1]
+            )
+        )
+        prev_action = tf.Variable(
+            tf.random.uniform(
+                [batch_size_1, action_dim, 1]
+            )
+        )
+        action = actor(state, taus, prev_action)
+        self.assertEqual(action.shape[0], batch_size_1)
+        self.assertEqual(action.shape[1], action_dim)
+
+    def test_critic_network(self):
+        batch_size_1 = 10
+        num_inputs = 20
+        critic = gac_networks.Critic(num_inputs)
+        # random variable to feed into critic
+        x = tf.Variable(
+            tf.random.normal(
+                [batch_size_1, num_inputs],
+                stddev=.1,
+                dtype=tf.float32
+            )
+        )
+        out = critic(x)
+        self.assertEqual(action.shape[0], batch_size_1)
+        self.assertEqual(action.shape[1], 1)
+
 
 if __name__ == '__main__':
     unittest.main()
