@@ -1,6 +1,7 @@
 # import external dependencies
 import tensorflow as tf
-
+from tensorflow.keras import Sequential
+from tensorflow.keras.layers import Dense
 # import internal dependencies
 import policies.gac.gac_helpers.helpers as helpers
 
@@ -237,30 +238,29 @@ class Critic(tf.Module):
     num_networks (int): number of critc networks need to be created
     '''
     def __init__(self, num_inputs, num_networks=1):
-        super(Critic, self).__init__()
-        self.input = tf.placeholder(tf.float32, [num_input])
+        super(Critic, self).__init__()        
         self.num_networks = num_networks
+        self.num_inputs = num_inputs
         self.q1 = self.build()
         if self.num_networks == 2:
             self.q2 = self.build()
         elif self.num_networks > 2 or self.num_networks < 1:
             raise NotImplementedError
-        # create a session for execution of the graph
-        self.session = tf.Session()
-        self.session.run(tf.global_variables_initializer())
-
+        
     def build(self):
-        # A helper function for building the graph
-        out1 = tf.keras.layers.dense(self.input, units=400, activation=tf.nn.leaky_relu)
-        out2 = tf.keras.layers.dense(out1, units=300, activation=tf.nn.leaky_relu)
-        return tf.keras.layers.dense(out2, units=1)
-
+    # A helper function for building the graph
+        model = Sequential()
+        model.add(Dense(units=400, input_shape=(self.num_inputs,), activation=tf.nn.leaky_relu))
+        model.add(Dense(units=300, activation=tf.nn.leaky_relu))
+        model.add(Dense(units=1))
+        return model
+    
     def __call__(self, x):
         # This function returns the value of the forward path given input x
         if self.num_networks == 1:
-            return self.session.run(self.q1, feed_dict={self.input:x})
+            return self.q1(x)
         else:
-            return self.session.run([self.q1, self.q2], feed_dict={self.input:x})
+            return self.q1(x), self.q2(x)
 
 
 class Value(Critic):
