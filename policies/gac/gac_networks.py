@@ -222,9 +222,9 @@ class StochasticActor(tf.Module):
         state_embedding = self.l1(state) # (batch_size, self.hidden_size * self.action_dim)
         noise_embedding = self.phi(taus) # (batch_size, self.action_dim, self.hidden_size)
         # again, phi (CosineBasisLinear) is an entry-wise embedding.
-        noise_embedding = tf.reshape(noise_embedding, (-1, self.hidden_size * self.action_dim)) 
+        noise_embedding = tf.reshape(noise_embedding, (-1, self.hidden_size * self.action_dim))
                         # (batch_size, self.hidden_size * self.action_dim)
-        hadamard_product = state_embedding * noise_embedding 
+        hadamard_product = state_embedding * noise_embedding
                         # (batch_size, self.hidden_size * self.action_dim)
         l2 = self.l2(hadamard_product)  #(batch_size, 200)
         next_actions = self.l3(l2) # (batch_size, self.action_dim)
@@ -243,7 +243,7 @@ class Critic(tf.Module):
     num_networks (int): number of critc networks need to be created
     '''
     def __init__(self, num_inputs, num_networks=1):
-        super(Critic, self).__init__()        
+        super(Critic, self).__init__()
         self.num_networks = num_networks
         self.num_inputs = num_inputs
         self.q1 = self.build()
@@ -251,7 +251,7 @@ class Critic(tf.Module):
             self.q2 = self.build()
         elif self.num_networks > 2 or self.num_networks < 1:
             raise NotImplementedError
-        
+
     def build(self):
     # A helper function for building the graph
         model = Sequential()
@@ -259,7 +259,7 @@ class Critic(tf.Module):
         model.add(Dense(units=300, activation=tf.nn.leaky_relu))
         model.add(Dense(units=1))
         return model
-    
+
     def __call__(self, x):
         # This function returns the value of the forward path given input x
         if self.num_networks == 1:
@@ -273,7 +273,7 @@ class Value(Critic):
     """
     Value network has the same architecture as Critic
     """
-    
+
     def __init__(self, num_inputs, num_networks=1):
         super(Value, self).__init__()
 
@@ -300,8 +300,8 @@ class Value(Critic):
         Get the Q value of the states and action samples.
         """
         Q1, Q2 = critic(
-                tf.concat([states, actions], -1)
-                )
+            tf.concat([states, actions], -1)
+        )
 
         """
         Line 14 of Algorithm 2.
@@ -310,9 +310,9 @@ class Value(Critic):
         v1 = tf.reduce_sum(Q1, 1, keepdims=True)
         v2 = tf.reduce_sum(Q2, 1, keepdims=True)
         v_true = tf.reduce_min(
-                tf.concat([v1, v2], 1),
-                1,
-                )
+            tf.concat([v1, v2], 1),
+            1,
+        )
 
         """
         Line 15 of Algorithm 2.

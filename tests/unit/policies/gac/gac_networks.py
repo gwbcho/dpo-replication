@@ -134,8 +134,8 @@ class TestGacNetworks(unittest.TestCase):
             )
         )
         out = critic(x)
-        self.assertEqual(action.shape[0], batch_size_1)
-        self.assertEqual(action.shape[1], 1)
+        self.assertEqual(out.shape[0], batch_size_1)
+        self.assertEqual(out.shape[1], 1)
 
 
 if __name__ == '__main__':
