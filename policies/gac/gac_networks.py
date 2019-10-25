@@ -253,7 +253,7 @@ class Critic(tf.Module):
             raise NotImplementedError
 
     def build(self):
-    # A helper function for building the graph
+        # A helper function for building the graph
         model = Sequential()
         model.add(Dense(units=400, input_shape=(self.num_inputs,), activation=tf.nn.leaky_relu))
         model.add(Dense(units=300, activation=tf.nn.leaky_relu))
@@ -261,6 +261,29 @@ class Critic(tf.Module):
         model.compile(optimizer='adam', loss='mse')
         return model
 
+    def train(self, transitions, value, gamma):
+        """
+        transitions is of type named tuple policies.policy_helpers.helpers.Transition
+        q1, q2 are seperate Q networks, thus can be trained separately
+        """
+
+        """
+        Line 10 of Algorithm 2
+        """
+        Q = transitions.r + gamma * value(transitions.sp)
+
+        """
+        Line 11-12 of Algorithm 2
+        """
+        x = tf.concat([transitions.s, transitions.a], -1)
+        history1 = self.q1.fit(x, Q)
+        if self.num_networks == 2:
+            history2 = self.q2.fit(x, Q)
+            return history1, history2
+        else:
+            return history1
+
+    
     def __call__(self, x):
         # This function returns the value of the forward path given input x
         if self.num_networks == 1:
@@ -280,7 +303,7 @@ class Value(Critic):
 
     def train(self, transitions, action_sampler, actor, critic, K):
         """
-        transition is of type named tuple policies.policy_helpers.helpers.Transition
+        transitions is of type named tuple policies.policy_helpers.helpers.Transition
         action_sampler is of type policies.policy_helpers.helpers.ActionSampler
         """
 
