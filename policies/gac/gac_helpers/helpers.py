@@ -5,7 +5,7 @@ import tensorflow as tf
 def cosine_basis_functions(x, n_basis_functions=64):
     """
     Cosine basis function (the function is denoted as psi in the paper). This is used to embed
-    [0, 1] -> R^d.
+    [0, 1] -> R^d. The i th component of output is cos(i*x).
 
     Args:
         x (tf.Variable)

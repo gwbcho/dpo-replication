@@ -18,7 +18,8 @@ classes, if for no other reason than legibility.
 class CosineBasisLinear(tf.Module):
     def __init__(self, n_basis_functions, out_size, activation = None):
         """
-        Parametrize the embeding function using Fourier series up to n_basis_functions terms
+        Parametrize the embeding function using Fourier series up to n_basis_functions terms.
+        If my understanding is correct, it's an entry-wise embedding function, i.e. from R to R^d.
         Class Args:
             n_basis_functions (int): the number of basis functions
             out_size (int): the dimensionality of embedding
@@ -35,14 +36,14 @@ class CosineBasisLinear(tf.Module):
     def __call__(self, x):
         """
         Args:
-            x: tensor (batch_size_1, batch_size_2): one of the action components. batch_size_1
-            and batch_size_2 correspond to the batch size of states (N) and actions per state (K)
+            x: tensor (batch_size, a), a is arbitrary, e.g. dimensionality of action vector.
         Return:
-            out: tensor (batch_size_1, batch_size_2, out_size): the embedding vector phi(x).
+            out: tensor (batch_size, a, out_size): the embedding vector phi(x).
         """
         batch_size = x.shape[0]
         h = helpers.cosine_basis_functions(x, self.n_basis_functions)
-        out = self.act_linear(h)
+            # (size of x , n_basis_functions)
+        out = self.act_linear(h) # (size of x , out_size)
         out = tf.reshape(out, (batch_size, -1, self.out_size))
         return out
 
@@ -175,12 +176,14 @@ class AutoRegressiveStochasticActor(tf.Module):
 class StochasticActor(tf.Module):
     def __init__(self, num_inputs, action_dim, n_basis_functions):
         """
-        the stochasitc action generator.
+        The stochasitc action generator, takes state and tau (random vector) as input, and output
+        the next action. If my understanding is correct, this generator is not in an autoregressive
+        way, i.e. the next action is generated as a whole, instead of one dimension by one dimension.
 
         Class Args:
-            num_inputs (int): number of inputs used for state embedding
+            num_inputs (int): the dimensionality of the state vector
             action_dim (int): the dimensionality of the action vector
-            n_basis_functions (int): the number of basis functions
+            n_basis_functions (int): the number of basis functions for noise embedding.
         """
         super(StochasticActor, self).__init__()
         hidden_size = int(400 / action_dim)
@@ -209,20 +212,22 @@ class StochasticActor(tf.Module):
 
     def __call__(self, state, taus, actions):
         """
-        TODO still not sure about the tensor size.
         Args:
             state: tensor (batch_size, num_inputs)
-            taus:
-            actions:
+            taus: tensor (batch_size, action_dim)
+            actions: tensor (batch_size, action_dim), but is not used here...
         Return:
-            next_actions:
+            next_actions: tensor (batch_size, action_dim)
         """
-        state_embedding = self.l1(state)
-        noise_embedding = self.phi(taus)
-        noise_embedding = tf.reshape(noise_embedding, (-1, self.hidden_size * self.action_dim))
-        hadamard_product = state_embedding * noise_embedding
-        l2 = self.l2(hadamard_product)
-        next_actions = self.l3(l2)
+        state_embedding = self.l1(state) # (batch_size, self.hidden_size * self.action_dim)
+        noise_embedding = self.phi(taus) # (batch_size, self.action_dim, self.hidden_size)
+        # again, phi (CosineBasisLinear) is an entry-wise embedding.
+        noise_embedding = tf.reshape(noise_embedding, (-1, self.hidden_size * self.action_dim)) 
+                        # (batch_size, self.hidden_size * self.action_dim)
+        hadamard_product = state_embedding * noise_embedding 
+                        # (batch_size, self.hidden_size * self.action_dim)
+        l2 = self.l2(hadamard_product)  #(batch_size, 200)
+        next_actions = self.l3(l2) # (batch_size, self.action_dim)
 
         return next_actions
 
