@@ -253,14 +253,15 @@ class Critic(tf.Module):
         model.add(Dense(units=400, input_shape=(self.num_inputs,), activation=tf.nn.leaky_relu))
         model.add(Dense(units=300, activation=tf.nn.leaky_relu))
         model.add(Dense(units=1))
+        model.compile(optimizer='adam', loss='mse')
         return model
     
     def __call__(self, x):
         # This function returns the value of the forward path given input x
         if self.num_networks == 1:
-            return self.q1(x)
+            return self.q1.predict(x)
         else:
-            return self.q1(x), self.q2(x)
+            return self.q1.predict(x), self.q2.predict(x)
 
 
 class Value(Critic):
@@ -270,19 +271,22 @@ class Value(Critic):
     """
     
     def __init__(self, num_inputs, num_networks=1):
-        super(Value, self).__init__()
+        super(Value, self).__init__(num_inputs, num_networks)
 
-    def train_op(self, transitions, action_sampler, actor, critic, K):
+    def train(self, transitions, action_sampler, actor, critic, K):
         """
         transition is of type named tuple policies.policy_helpers.helpers.Transition
         action_sampler is of type policies.policy_helpers.helpers.ActionSampler
         """
 
         """Each state needs K action samples"""
-        # batch size x 1 x state dim
+        # [batch size , 1 , state dim]
         states = tf.expand_dims(transitions.s, 1)
-        # batch size x K x state dim
-        states = tf.broadcast_to(states, [states.shape[0], K] + states.shape[1:])
+        # [batch size , K , state dim]
+        states = tf.broadcast_to(states, [states.shape[0], K] + states.shape[2:])
+        # [batch size x K , state dim]
+        states = tf.reshape(states, [-1, self.num_inputs])
+        
 
         """
         Line 13 of Algorithm 2.
@@ -297,6 +301,8 @@ class Value(Critic):
         Q1, Q2 = critic(
                 tf.concat([states, actions], -1)
                 )
+        Q1 = tf.reshape(Q1, [-1, K, 1])
+        Q2 = tf.reshape(Q2, [-1, K, 1])
 
         """
         Line 14 of Algorithm 2.
@@ -314,9 +320,4 @@ class Value(Critic):
         Get value of current state from the Value network.
         Loss is MSE.
         """
-        v_pred = self(transitions.s)
-        loss = tf.keras.losses.MSE(v_true, v_pred)
-        adam = tf.keras.optimizers.Adam(learning_rate=1e-3)
-        vars = self.trainable_variables
-        grads = adam.get_gradients(loss, vars)
-        return adam.apply_gradients(list(zip(grads, vars)))
+        return self.q1.fit(transitions.s, v_true)
