@@ -76,6 +76,9 @@ class IQNSuperClass(tf.Module):
         eltwise_loss = abs(taus - I_delta) * eltwise_huber_loss * weighting
         return tf.math.reduce_mean(eltwise_loss)
 
+    def __call__(self, state, taus, actions=None):
+        return
+
     def train(self):
         """
         Function to train IQN related classes
@@ -83,7 +86,7 @@ class IQNSuperClass(tf.Module):
         return
 
 
-class AutoRegressiveStochasticActor(tf.Module):
+class AutoRegressiveStochasticActor(IQNSuperClass):
     def __init__(self, num_inputs, action_dim, n_basis_functions):
         """
         the autoregressive stochastic actor is an implicit quantile network used to sample from a
@@ -208,7 +211,7 @@ class AutoRegressiveStochasticActor(tf.Module):
         return tf.squeeze(actions, -1)
 
 
-class StochasticActor(tf.Module):
+class StochasticActor(IQNSuperClass):
     def __init__(self, num_inputs, action_dim, n_basis_functions):
         """
         The stochasitc action generator, takes state and tau (random vector) as input, and output
@@ -318,7 +321,7 @@ class Critic(tf.Module):
         else:
             return history1
 
-    
+
     def __call__(self, x):
         # This function returns the value of the forward path given input x
         if self.num_networks == 1:
@@ -349,7 +352,7 @@ class Value(Critic):
         states = tf.broadcast_to(states, [states.shape[0], K] + states.shape[2:])
         # [batch size x K , state dim]
         states = tf.reshape(states, [-1, self.num_inputs])
-        
+
 
         """
         Line 13 of Algorithm 2.
