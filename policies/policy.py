@@ -19,7 +19,7 @@ class Policy:
 
     def __init__(self, gamma, tau, num_inputs, action_space, replay_size, normalize_obs=True,
                  normalize_returns=False):
-
+        pass
     def act(self, state):
-        ...
+        pass
 
