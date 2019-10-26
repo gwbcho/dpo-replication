@@ -19,7 +19,7 @@ class CosineBasisLinear(tf.Module):
     def __init__(self, n_basis_functions, out_size, activation = None):
         """
         Parametrize the embeding function using Fourier series up to n_basis_functions terms.
-        If my understanding is correct, it's an entry-wise embedding function, i.e. from R to R^d.
+        It's an entry-wise embedding function, i.e. from R to R^d.
         Class Args:
             n_basis_functions (int): the number of basis functions
             out_size (int): the dimensionality of embedding
@@ -51,7 +51,7 @@ class CosineBasisLinear(tf.Module):
 class IQNSuperClass(tf.Module):
     def __init__(self):
         super(IQNSuperClass, self).__init__()
-        self.huber_loss_function = tf.keras.losses.Huber(delta=1.0)
+        self.huber_loss_function = tf.keras.losses.Huber(delta=1.0) # delta is kappa in paper
 
     def compute_eltwise_huber_quantile_loss(self, actions, target_actions, taus, weighting):
         """
@@ -61,6 +61,8 @@ class IQNSuperClass(tf.Module):
         taus (used to compute y) and taus_prime (used to compute t) are iid samples
         from U([0,1]).
 
+        rho function in the paper = |taus - (target_actions - action) < 0| * huber_loss
+
         Args:
             actions (tf.Variable): Quantile prediction from taus as a
                 (batch_size, N, K)-shaped array.
@@ -68,7 +70,8 @@ class IQNSuperClass(tf.Module):
                 (batch_size, N, K)-shaped array.
             taus (tf.Variable): Quantile thresholds used to compute y as a
                 (batch_size, N, 1)-shaped array.
-
+            weighting (tf.Variable): The density of target action distribution (D) as a 
+                (batch_size, N, K)-shaped array. 
         Returns:
             Loss for IQN super class
         """
@@ -212,9 +215,9 @@ class AutoRegressiveStochasticActor(IQNSuperClass):
 class StochasticActor(IQNSuperClass):
     def __init__(self, num_inputs, action_dim, n_basis_functions):
         """
-        The stochasitc action generator, takes state and tau (random vector) as input, and output
-        the next action. If my understanding is correct, this generator is not in an autoregressive
-        way, i.e. the next action is generated as a whole, instead of one dimension by one dimension.
+        The IQN stochasitc action generator, takes state and tau (random vector) as input, and output
+        the next action. This generator is not in an autoregressive way, i.e. the next action is 
+        generated as a whole, instead of one dimension by one dimension.
 
         Class Args:
             num_inputs (int): the dimensionality of the state vector
