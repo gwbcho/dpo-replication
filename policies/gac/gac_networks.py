@@ -48,6 +48,41 @@ class CosineBasisLinear(tf.Module):
         return out
 
 
+class IQNSuperClass(tf.Module):
+    def __init__(self, self, num_inputs, action_dim, n_basis_functions):
+        super(IQNSuperClass, self).__init__()
+
+    def compute_eltwise_huber_quantile_loss(actions, target_actions, taus, weighting):
+        """
+        Compute elementwise Huber losses for quantile regression.
+        This is based on Algorithm 1 of https://arxiv.org/abs/1806.06923.
+        This function assumes that, both of the two kinds of quantile thresholds,
+        taus (used to compute y) and taus_prime (used to compute t) are iid samples
+        from U([0,1]).
+
+        Args:
+            actions (tf.Variable): Quantile prediction from taus as a
+                (batch_size, N, K)-shaped array.
+            target_actions (tf.Variable): Quantile targets from taus as a
+                (batch_size, N, K)-shaped array.
+            taus (ndarray): Quantile thresholds used to compute y as a
+                (batch_size, N, 1)-shaped array.
+
+        Returns:
+            Loss for IQN super class
+        """
+        I_delta = tf.dtypes.cast(((actions - target_actions) > 0), tf.float32)
+        eltwise_huber_loss = tf.keras.losses.huber_loss(target_actions, actions, delta=1.0)
+        eltwise_loss = abs(taus - I_delta) * eltwise_huber_loss * weighting
+        return tf.math.reduce_mean(eltwise_loss)
+
+    def train(self):
+        """
+        Function to train IQN related classes
+        """
+        return
+
+
 class AutoRegressiveStochasticActor(tf.Module):
     def __init__(self, num_inputs, action_dim, n_basis_functions):
         """
