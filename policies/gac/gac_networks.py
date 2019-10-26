@@ -53,6 +53,30 @@ class IQNSuperClass(tf.Module):
         super(IQNSuperClass, self).__init__()
         self.huber_loss_function = tf.keras.losses.Huber(delta=1.0) # delta is kappa in paper
 
+    def target_policy_density(self, mode, actions, states, critic, value):
+        '''
+        The density of target policy D(a|s)
+        Comes from table 1 in the paper.
+        Args:
+            mode: ["linear", "boltzmann"]
+            actions (tf.tensor): (batch_size, action_dim)
+            states (tf.tensor): (batch_size, state_dim)
+            critic (function):  (batch_size, state_dim) x (batch_size, action_dim) -> (batch_size, 1)
+            value (function): (batch_size, state_dim) -> (batch_size, 1)
+        Returns:
+            density of D(a|s)
+
+        '''
+        A = critic(states, actions) - value(actions)
+        indicator = tf.dtypes.cast(A > 0, tf.float32)
+        if mode == "linear":
+            return indicator * A / tf.reduce_sum(A)
+        elif mode == "boltzmann":
+            beta = 1.0
+            return indicator * tf.nn.softmax(A/beta)
+        else:
+            raise NotImplementedError
+
     def compute_eltwise_huber_quantile_loss(self, actions, target_actions, taus, weighting):
         """
         Compute elementwise Huber losses for quantile regression.
