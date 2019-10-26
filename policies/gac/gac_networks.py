@@ -72,7 +72,7 @@ class IQNSuperClass(tf.Module):
             Loss for IQN super class
         """
         I_delta = tf.dtypes.cast(((actions - target_actions) > 0), tf.float32)
-        eltwise_huber_loss = tf.keras.losses.huber_loss(target_actions, actions, delta=1.0)
+        eltwise_huber_loss = tf.keras.losses.Huber(delta=1.0)(target_actions, actions)
         eltwise_loss = abs(taus - I_delta) * eltwise_huber_loss * weighting
         return tf.math.reduce_mean(eltwise_loss)
 
