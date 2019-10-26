@@ -48,7 +48,43 @@ class CosineBasisLinear(tf.Module):
         return out
 
 
-class AutoRegressiveStochasticActor(tf.Module):
+class IQNSuperClass(tf.Module):
+    def __init__(self):
+        super(IQNSuperClass, self).__init__()
+        self.huber_loss_function = tf.keras.losses.Huber(delta=1.0)
+
+    def compute_eltwise_huber_quantile_loss(self, actions, target_actions, taus, weighting):
+        """
+        Compute elementwise Huber losses for quantile regression.
+        This is based on Algorithm 1 of https://arxiv.org/abs/1806.06923.
+        This function assumes that, both of the two kinds of quantile thresholds,
+        taus (used to compute y) and taus_prime (used to compute t) are iid samples
+        from U([0,1]).
+
+        Args:
+            actions (tf.Variable): Quantile prediction from taus as a
+                (batch_size, N, K)-shaped array.
+            target_actions (tf.Variable): Quantile targets from taus as a
+                (batch_size, N, K)-shaped array.
+            taus (tf.Variable): Quantile thresholds used to compute y as a
+                (batch_size, N, 1)-shaped array.
+
+        Returns:
+            Loss for IQN super class
+        """
+        I_delta = tf.dtypes.cast(((actions - target_actions) > 0), tf.float32)
+        eltwise_huber_loss = self.huber_loss_function(target_actions, actions)
+        eltwise_loss = tf.math.abs(taus - I_delta) * eltwise_huber_loss * weighting
+        return tf.math.reduce_mean(eltwise_loss)
+
+    def train(self):
+        """
+        Function to train IQN related classes
+        """
+        return
+
+
+class AutoRegressiveStochasticActor(IQNSuperClass):
     def __init__(self, num_inputs, action_dim, n_basis_functions):
         """
         the autoregressive stochastic actor is an implicit quantile network used to sample from a
@@ -173,7 +209,7 @@ class AutoRegressiveStochasticActor(tf.Module):
         return tf.squeeze(actions, -1)
 
 
-class StochasticActor(tf.Module):
+class StochasticActor(IQNSuperClass):
     def __init__(self, num_inputs, action_dim, n_basis_functions):
         """
         The stochasitc action generator, takes state and tau (random vector) as input, and output
@@ -210,7 +246,7 @@ class StochasticActor(tf.Module):
             input_shape = (200,)
         )
 
-    def __call__(self, state, taus, actions):
+    def __call__(self, state, taus, actions=None):
         """
         Args:
             state: tensor (batch_size, num_inputs)
@@ -283,7 +319,7 @@ class Critic(tf.Module):
         else:
             return history1
 
-    
+
     def __call__(self, x):
         # This function returns the value of the forward path given input x
         if self.num_networks == 1:
@@ -314,7 +350,7 @@ class Value(Critic):
         states = tf.broadcast_to(states, [states.shape[0], K] + states.shape[2:])
         # [batch size x K , state dim]
         states = tf.reshape(states, [-1, self.num_inputs])
-        
+
 
         """
         Line 13 of Algorithm 2.
