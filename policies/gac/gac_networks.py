@@ -49,7 +49,7 @@ class CosineBasisLinear(tf.Module):
 
 
 class IQNSuperClass(tf.Module):
-    def __init__(self, num_inputs, action_dim, n_basis_functions):
+    def __init__(self):
         super(IQNSuperClass, self).__init__()
 
     def compute_eltwise_huber_quantile_loss(actions, target_actions, taus, weighting):
@@ -76,9 +76,6 @@ class IQNSuperClass(tf.Module):
         eltwise_loss = abs(taus - I_delta) * eltwise_huber_loss * weighting
         return tf.math.reduce_mean(eltwise_loss)
 
-    def __call__(self, state, taus, actions=None):
-        return
-
     def train(self):
         """
         Function to train IQN related classes
@@ -98,11 +95,7 @@ class AutoRegressiveStochasticActor(IQNSuperClass):
             action_dim (int): the dimensionality of the action vector
             n_basis_functions (int): the number of basis functions
         """
-        super(AutoRegressiveStochasticActor, self).__init__(
-            num_inputs,
-            action_dim,
-            n_basis_functions
-        )
+        super(AutoRegressiveStochasticActor, self).__init__()
         # create all necessary class variables
         self.action_dim = action_dim
         self.state_embedding = tf.keras.layers.Dense(
@@ -227,7 +220,7 @@ class StochasticActor(IQNSuperClass):
             action_dim (int): the dimensionality of the action vector
             n_basis_functions (int): the number of basis functions for noise embedding.
         """
-        super(StochasticActor, self).__init__(num_inputs, action_dim, n_basis_functions)
+        super(StochasticActor, self).__init__()
         hidden_size = int(400 / action_dim)
         self.hidden_size = hidden_size
         self.action_dim = action_dim
@@ -252,7 +245,7 @@ class StochasticActor(IQNSuperClass):
             input_shape = (200,)
         )
 
-    def __call__(self, state, taus, actions):
+    def __call__(self, state, taus, actions=None):
         """
         Args:
             state: tensor (batch_size, num_inputs)
