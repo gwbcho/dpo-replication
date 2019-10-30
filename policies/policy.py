@@ -1,4 +1,5 @@
 # external dependencies
+import numpy as np
 import tensorflow as tf
 
 # internal dependencies
@@ -45,6 +46,7 @@ class Policy(helper_classes.HelperPolicyClass):
         self.memory = helper_classes.ReplayMemory(replay_size)
         self.actor = None
         self.actor_perturbed = None
+        self.policy = helper_classes.ActionSampler(self.action_space)
 
     def select_action(self, state, action_noise=None, param_noise=None):
         '''
@@ -57,11 +59,10 @@ class Policy(helper_classes.HelperPolicyClass):
         )
 
         if param_noise is not None:
-            action = self.policy(self.actor_perturbed, state)[0]
+            action = self.policy.get_actions(self.actor_perturbed, state)[0]
         else:
-            action = self.policy(self.actor, state)[0]
+            action = self.policy.get_actions(self.actor, state)[0]
 
-        action = action.data
         if action_noise is not None:
             action += tf.Variable(action_noise())
 
@@ -100,8 +101,7 @@ class Policy(helper_classes.HelperPolicyClass):
                     1
                 )
             ),
-            self.ret_rms,
-            self.device
+            self.ret_rms
         )
         mask_batch = tf.Variable(
             tf.expand_dims(
@@ -113,14 +113,19 @@ class Policy(helper_classes.HelperPolicyClass):
             tf.Variable(
                 tf.stack(batch.next_state)
             ),
-            self.obs_rms,
-            self.device
+            self.obs_rms
         )
 
         if self.normalize_returns:
             reward_batch = tf.clip_by_value(reward_batch, -self.cliprew, self.cliprew)
 
-        value_loss = self.update_critic(state_batch, action_batch, reward_batch, mask_batch, next_state_batch)
+        value_loss = self.update_critic(
+            state_batch,
+            action_batch,
+            reward_batch,
+            mask_batch,
+            next_state_batch
+        )
         policy_loss = self.update_actor(state_batch)
 
         self.soft_update()
@@ -139,15 +144,5 @@ class Policy(helper_classes.HelperPolicyClass):
             param = params[name]
             param += tf.random.normal(param.shape) * param_noise.current_stddev
 
-    def _tile(self, a, dim, n_tile):
-        init_dim = a.shape[dim]
-        repeat_idx = [1] * a.shape[dim]
-        repeat_idx[dim] = n_tile
-        a = a.repeat(*(repeat_idx))
-        order_index = tf.Variable(
-            np.concatenate(
-                [init_dim * np.arange(n_tile) + i for i in range(init_dim)]
-            ),
-            dtype=tf.int64
-        )
-        return tf.gather_nd(a, order_index, dim)
+    def _tile(self, a, n_tile):
+        return tf.tile(a, n_tile)
