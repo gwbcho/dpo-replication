@@ -51,7 +51,8 @@ class CosineBasisLinear(tf.Module):
 class IQNSuperClass(tf.Module):
     def __init__(self):
         super(IQNSuperClass, self).__init__()
-        self.huber_loss_function = tf.keras.losses.Huber(delta=1.0) # delta is kappa in paper
+        self.module_type = 'IQNSuperClass'
+        self.huber_loss_function = tf.keras.losses.Huber(delta=1.0)  # delta is kappa in paper
 
     def target_policy_density(self, mode, actions, states, critic, value):
         '''
@@ -94,8 +95,8 @@ class IQNSuperClass(tf.Module):
                 (batch_size, N, K)-shaped array.
             taus (tf.Variable): Quantile thresholds used to compute y as a
                 (batch_size, N, 1)-shaped array.
-            weighting (tf.Variable): The density of target action distribution (D) as a 
-                (batch_size, N, K)-shaped array. 
+            weighting (tf.Variable): The density of target action distribution (D) as a
+                (batch_size, N, K)-shaped array.
         Returns:
             Loss for IQN super class
         """
@@ -103,12 +104,6 @@ class IQNSuperClass(tf.Module):
         eltwise_huber_loss = self.huber_loss_function(target_actions, actions)
         eltwise_loss = tf.math.abs(taus - I_delta) * eltwise_huber_loss * weighting
         return tf.math.reduce_mean(eltwise_loss)
-
-    def train(self):
-        """
-        Function to train IQN related classes
-        """
-        return
 
 
 class AutoRegressiveStochasticActor(IQNSuperClass):
@@ -125,6 +120,7 @@ class AutoRegressiveStochasticActor(IQNSuperClass):
         """
         super(AutoRegressiveStochasticActor, self).__init__()
         # create all necessary class variables
+        self.module_type = 'AutoRegressiveStochasticActor'
         self.action_dim = action_dim
         self.state_embedding = tf.keras.layers.Dense(
             400,  # as specified by the architecture in the paper and in their code
@@ -240,7 +236,7 @@ class StochasticActor(IQNSuperClass):
     def __init__(self, num_inputs, action_dim, n_basis_functions):
         """
         The IQN stochasitc action generator, takes state and tau (random vector) as input, and output
-        the next action. This generator is not in an autoregressive way, i.e. the next action is 
+        the next action. This generator is not in an autoregressive way, i.e. the next action is
         generated as a whole, instead of one dimension by one dimension.
 
         Class Args:
@@ -249,6 +245,7 @@ class StochasticActor(IQNSuperClass):
             n_basis_functions (int): the number of basis functions for noise embedding.
         """
         super(StochasticActor, self).__init__()
+        self.module_type = 'StochasticActor'
         hidden_size = int(400 / action_dim)
         self.hidden_size = hidden_size
         self.action_dim = action_dim

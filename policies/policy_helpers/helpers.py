@@ -1,18 +1,6 @@
 # system dependencies
-import os
-import random
-from collections import namedtuple
 import tensorflow as tf
 
-"""
-A transition is made of state, action, reward, state', is_terminal.
-is_terminal flags if state is a terminal state, in which case this
-transition should not be counted when calculating reward.
-"""
-Transition = namedtuple(
-    'Transition',
-    ['s', 'a', 'r', 'sp', 'is_terminal']
-)
 
 """
 File Description:
@@ -20,52 +8,44 @@ File Description:
 Helper functions for the policy class/file and may be used in other classes as well.
 """
 
-class Replay():
+
+def soft_update(target, source, tau):
     """
-    Holds Transition tuple (s,a,r,sp,is_terminal) and provides random sampling of them.
+    Soft update function.
+
+    Args:
+        target (tf.Variable): Variable containing target information
+        source (tf.Variable): Variable containing source information
     """
-
-    def __init__(self, size):
-        self.size = size    # maximum number of items in this replay buffer
-        self.buffer = []
-        self.end = 0    # end is the index of last item
-
-    def append(self, transition):
-        if len(self) < self.size:
-            # buffer is not full yet
-            self.buffer.append(transition)
-            self.end = len(self)-1
-        else:
-            # buffer is full, overwrite the oldest one
-            self.end = (self.end+1) % self.size
-            self.buffer[self.end] = transition
-
-    def sample(self, n):
-        return random.sample(self.buffer, n)
-
-    def __len__(self):
-        return len(self.buffer)
+    for target_param, param in zip(target.trainable_parameters, source.trainable_parameters):
+        target_param.assign(target_param * (1.0 - tau) + param * tau)
 
 
-class ActionSampler():
+def hard_update(target, source):
     """
-    Sampling actions from a given actor by feeding samples from a uniform distribution into the
-    actor network.
+    Hard update function (converts all values directly instead of using a learning rate)
+
+    Args:
+        target (tf.Variable): Variable containing target information
+        source (tf.Variable): Variable containing source information (delayed info)
     """
+    for target_param, param in zip(target.trainable_parameters, source.trainable_parameters):
+        target_param.assign(param)
 
-    def __init__(self, action_dim):
-        self.dim = action_dim
 
-    def get_actions(self, actor, states, actions=None):
-        """
-        Actions are obtained from the actor network.
-        """
-        if states.shape.rank > 1:
-            batch_size = states.shape[0]
-        else:
-            batch_size = 1
-        return actor(
-            states,
-            tf.random.uniform((batch_size, self.dim), minval=0.0, maxval=1.0),
-            actions
-        )
+def normalize(x, stats):
+    """
+    Note: Not sure if this is correct
+    """
+    if stats is None:
+        return x
+    mean, variance = tf.moments(stats, axes=1)
+    return (x - tf.Variable(mean)) / tf.Variable(tf.sqrt(variance))
+
+
+def denormalize(x, stats):
+    if stats is None:
+        return x
+    mean, variance = tf.moments(stats, axes=1)
+    sigma = tf.sqrt(variance)
+    return x * sigma + mean
