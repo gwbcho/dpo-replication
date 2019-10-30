@@ -47,6 +47,10 @@ class Policy(helper_classes.HelperPolicyClass):
         self.actor_perturbed = None
 
     def select_action(self, state, action_noise=None, param_noise=None):
+        '''
+        select action for state, using self.policy.
+        '''
+
         state = helpers.normalize(
             tf.Variable(state),
             self.obs_rms
