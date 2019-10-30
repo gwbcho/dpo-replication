@@ -49,10 +49,6 @@ class Policy(helper_classes.HelperPolicyClass):
         self.policy = helper_classes.ActionSampler(self.action_space)
 
     def select_action(self, state, action_noise=None, param_noise=None):
-        '''
-        select action for state, using self.policy.
-        '''
-
         state = helpers.normalize(
             tf.Variable(state),
             self.obs_rms
@@ -143,3 +139,17 @@ class Policy(helper_classes.HelperPolicyClass):
                 pass
             param = params[name]
             param += tf.random.normal(param.shape) * param_noise.current_stddev
+
+    def _tile(self, a, dim, n_tile):
+        init_dim = a.shape[dim]
+        num_dims = len(a.shape)
+        repeat_idx = [1] * num_dims
+        repeat_idx[dim] = n_tile
+        tiled_results = tf.tile(a, repeat_idx)
+        order_index = tf.Variable(
+            np.concatenate(
+                [init_dim * np.arange(n_tile) + i for i in range(init_dim)]
+            ),
+            dtype=tf.int64
+        )
+        return tf.gather_nd(tiled_results, order_index, dim)
