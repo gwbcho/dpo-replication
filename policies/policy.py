@@ -143,6 +143,3 @@ class Policy(helper_classes.HelperPolicyClass):
                 pass
             param = params[name]
             param += tf.random.normal(param.shape) * param_noise.current_stddev
-
-    def _tile(self, a, n_tile):
-        return tf.tile(a, n_tile)
