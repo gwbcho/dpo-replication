@@ -136,8 +136,8 @@ class Policy(helper_classes.HelperPolicyClass):
             param += tf.random.normal(param.shape) * param_noise.current_stddev
 
     def _tile(self, a, dim, n_tile):
-        init_dim = a.size[dim]
-        repeat_idx = [1] * a.size[dim]
+        init_dim = a.shape[dim]
+        repeat_idx = [1] * a.shape[dim]
         repeat_idx[dim] = n_tile
         a = a.repeat(*(repeat_idx))
         order_index = tf.Variable(
