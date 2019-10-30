@@ -1,9 +1,5 @@
 import tensorflow as tf
 
-import policies.gac.gac_helpers as gac_helpers
-import policies.gac.gac_networks as gac_networks
-import policies.policy as policy
-import policies.policy_helpers as policy_helpers
 
 
 """

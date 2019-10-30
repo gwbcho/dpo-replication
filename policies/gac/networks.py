@@ -22,7 +22,6 @@ class CosineBasisLinear(tf.Module):
         Class Args:
             n_basis_functions (int): the number of basis functions
             out_size (int): the dimensionality of embedding
-            activation: activation function before output
         """
         super(CosineBasisLinear, self).__init__()
         self.act_linear = tf.keras.layers.Dense(
@@ -236,7 +235,7 @@ class AutoRegressiveStochasticActor(IQNSuperClass):
 
 
 class StochasticActor(IQNSuperClass):
-    def __init__(self, action_dim, n_basis_functions):
+    def __init__(self, action_dim, n_basis_functions=64):
         """
         The IQN stochasitc action generator, takes state and tau (random vector) as input, and output
         the next action. This generator is not in an autoregressive way, i.e. the next action is 
@@ -247,9 +246,9 @@ class StochasticActor(IQNSuperClass):
             n_basis_functions (int): the number of basis functions for noise embedding.
         """
         super(StochasticActor, self).__init__()
-        self.l1 = tf.keras.layers.Dense(400)
-        cosine_hidden_size = 400//action_dim
-        assert cosine_hidden_size * action_dim == 400
+        self.l1 = tf.keras.layers.Dense(420)
+        cosine_hidden_size = 420//action_dim
+        assert cosine_hidden_size * action_dim == 420
         self.phi = CosineBasisLinear(n_basis_functions, cosine_hidden_size)
         self.l2 = tf.keras.layers.Dense(200)
         self.l3 = tf.keras.layers.Dense(action_dim)
@@ -265,7 +264,7 @@ class StochasticActor(IQNSuperClass):
         state_embedding = tf.keras.layers.LeakyReLU(self.l1(states)) # (batch_size, self.hidden_size * self.action_dim)
         noise_embedding = tf.keras.layers.LeakyReLU(self.phi(taus)) # (batch_size, self.action_dim, self.hidden_size)
         # again, phi (CosineBasisLinear) is an entry-wise embedding.
-        noise_embedding = tf.reshape(noise_embedding, (-1, 400))
+        noise_embedding = tf.reshape(noise_embedding, (-1, 420))
                         # (batch_size, self.hidden_size * self.action_dim)
         hadamard_product = state_embedding * noise_embedding
                         # (batch_size, self.hidden_size * self.action_dim)
