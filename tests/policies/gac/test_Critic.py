@@ -1,9 +1,9 @@
-from policies.gac.gac_networks import Value, Critic
-from policies.policy_helpers.helpers import Transition
+from policies.gac.networks import Value, Critic
+from policies.policy_helpers.helper_classes import Transition
 import tensorflow as tf
 
-critic = Critic(3+4, 2)
-value = Value(3, 1)
+critic = Critic(3, 4)
+value = Value(3)
 
 transitions = Transition(
         tf.convert_to_tensor(
@@ -39,5 +39,5 @@ transitions = Transition(
         ),
     )
 
-history1, history2 = critic.train(transitions, value, 0.99)
-print(history1.history, history2.history)
+history = critic.train(transitions, value, 0.99)
+print(history.history)

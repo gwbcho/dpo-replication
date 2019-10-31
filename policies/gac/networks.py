@@ -307,6 +307,15 @@ class StochasticActor(IQNSuperClass):
         return actions
 
 
+def _build_sequential_model(input_dim):
+    # A helper function for building the graph
+    model = Sequential()
+    model.add(Dense(units=400, input_shape=(input_dim,), activation=tf.nn.leaky_relu))
+    model.add(Dense(units=300, activation=tf.nn.leaky_relu))
+    model.add(Dense(units=1))
+    model.compile(optimizer='adam', loss='mse')
+    return model
+
 class Critic(tf.Module):
     '''
     The Critic class create one or two critic networks, which take states as input and return
@@ -315,31 +324,15 @@ class Critic(tf.Module):
 
     Class Args:
     state_dim (int): number of states
-    num_networks (int): number of critc networks need to be created
     '''
-    def __init__(self, state_dim, num_networks=1):
+    def __init__(self, state_dim, action_dim):
         super(Critic, self).__init__()
-        self.num_networks = num_networks
-        self.state_dim = state_dim
-        self.q1 = self.build()
-        if self.num_networks == 2:
-            self.q2 = self.build()
-        elif self.num_networks > 2 or self.num_networks < 1:
-            raise NotImplementedError
+        self.model = _build_sequential_model(state_dim+action_dim)
 
-    def build(self):
-        # A helper function for building the graph
-        model = Sequential()
-        model.add(Dense(units=400, input_shape=(self.state_dim,), activation=tf.nn.leaky_relu))
-        model.add(Dense(units=300, activation=tf.nn.leaky_relu))
-        model.add(Dense(units=1))
-        model.compile(optimizer='adam', loss='mse')
-        return model
 
     def train(self, transitions, value, gamma):
         """
         transitions is of type named tuple policies.policy_helpers.helpers.Transition
-        q1, q2 are seperate Q networks, thus can be trained separately
         """
 
         """
@@ -351,32 +344,27 @@ class Critic(tf.Module):
         Line 11-12 of Algorithm 2
         """
         x = tf.concat([transitions.s, transitions.a], -1)
-        history1 = self.q1.fit(x, Q)
-        if self.num_networks == 2:
-            history2 = self.q2.fit(x, Q)
-            return history1, history2
-        else:
-            return history1
+        history = self.model.fit(x, Q)
+        return history
 
 
-    def __call__(self, x):
-        # This function returns the value of the forward path given input x
-        if self.num_networks == 1:
-            return self.q1.predict(x)
-        else:
-            return self.q1.predict(x), self.q2.predict(x)
+    def __call__(self, states, actions):
+        x = tf.concat([states, actions], -1)
+        return self.model.predict(x)
 
 
-class Value(Critic):
+class Value():
 
     """
     Value network has the same architecture as Critic
     """
 
-    def __init__(self, state_dim, num_networks=1):
-        super(Value, self).__init__(state_dim, num_networks)
+    def __init__(self, state_dim):
+        self.model = _build_sequential_model(state_dim)
+        self.state_dim = state_dim
 
-    def train(self, transitions, action_sampler, actor, critic, K):
+
+    def train(self, transitions, action_sampler, actor, critic1, critic2, K):
         """
         transitions is of type named tuple policies.policy_helpers.helpers.Transition
         action_sampler is of type policies.policy_helpers.helpers.ActionSampler
@@ -401,9 +389,7 @@ class Value(Critic):
         Line 14 of Algorithm 2.
         Get the Q value of the states and action samples.
         """
-        Q1, Q2 = critic(
-            tf.concat([states, actions], -1)
-        )
+        Q1, Q2 = critic1(states, actions), critic2(states, actions)
         Q1 = tf.reshape(Q1, [-1, K, 1])
         Q2 = tf.reshape(Q2, [-1, K, 1])
 
@@ -423,7 +409,11 @@ class Value(Critic):
         Get value of current state from the Value network.
         Loss is MSE.
         """
-        return self.q1.fit(transitions.s, v_true)
+
+        return self.model.fit(transitions.s, v_true)
+
+    def __call__(self, states):
+        return self.model.predict(states)
 
 
 class ReplayBuffer:
@@ -457,3 +447,4 @@ class ReplayBuffer:
                     acts=self.acts_buf[idxs],
                     rews=self.rews_buf[idxs],
                     done=self.done_buf[idxs])
+
