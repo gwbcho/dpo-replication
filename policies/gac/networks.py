@@ -15,21 +15,19 @@ classes, if for no other reason than legibility.
 
 
 class CosineBasisLinear(tf.Module):
-    def __init__(self, n_basis_functions, out_size):
+    def __init__(self, n_basis_functions, embed_dim):
         """
-        Parametrize the embeding function using Fourier series up to n_basis_functions terms.
+        Parametrize the embedding function using Fourier series up to n_basis_functions terms.
         It's an entry-wise embedding function, i.e. from R to R^d.
         Class Args:
             n_basis_functions (int): the number of basis functions
-            out_size (int): the dimensionality of embedding
+            embed_dim (int): the dimensionality of embedding
         """
         super(CosineBasisLinear, self).__init__()
-        self.act_linear = tf.keras.layers.Dense(
-            out_size,
-            input_shape = (n_basis_functions,)
-        )
+        # coefficient of the basis
+        self.act_linear = tf.keras.layers.Dense(embed_dim,input_shape = (n_basis_functions,))
         self.n_basis_functions = n_basis_functions
-        self.out_size = out_size
+        self.embed_dim = embed_dim
 
     def _cosine_basis_functions(self, x, n_basis_functions=64):
         """
@@ -51,13 +49,13 @@ class CosineBasisLinear(tf.Module):
         Args:
             x: tensor (batch_size, a), a is arbitrary, e.g. dimensionality of action vector.
         Return:
-            out: tensor (batch_size, a, out_size): the embedding vector phi(x).
+            out: tensor (batch_size, a, embed_dim): the embedding vector phi(x).
         """
         batch_size = x.shape[0]
         h = self._cosine_basis_functions(x, self.n_basis_functions)
             # (size of x , n_basis_functions)
-        out = self.act_linear(h) # (size of x , out_size)
-        out = tf.reshape(out, (batch_size, -1, self.out_size))
+        out = self.act_linear(h) # (size of x , embed_dim)
+        out = tf.reshape(out, (batch_size, -1, self.embed_dim))
         return out
 
 
