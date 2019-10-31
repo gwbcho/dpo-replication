@@ -24,10 +24,6 @@ class GACAgent:
     """
 
     def __init__(self):
-        self.memory = policy_helper_classes.ReplayMemory(replay_size)
-        self.actor = None
-        self.actor_perturbed = None
-        self.policy = policy_helper_classes.ActionSampler(self.action_dim)
 
         if target_policy_q == 'min':
             self.target_policy_q = lambda x, y: tf.math.minimum(x, y)
