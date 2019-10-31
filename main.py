@@ -5,6 +5,7 @@ import gym
 import numpy as np
 import tensorflow as tf
 
+from environment.normalized_actions import NormalizedActions
 from policies.gac.networks import AutoRegressiveStochasticActor as AIQN
 from policies.gac.networks import StochasticActor as IQN
 from policies.gac.networks import Critic, Value
