@@ -58,21 +58,3 @@ class ActionSampler():
             tf.random.uniform((batch_size, self.dim), minval=0.0, maxval=1.0),
             actions
         )
-
-
-class HelperPolicyClass:
-
-    def policy(self, actor, state):
-        raise NotImplementedError
-
-    def update_critic(self, state_batch, action_batch, reward_batch, mask_batch, next_state_batch):
-        raise NotImplementedError
-
-    def soft_update(self):
-        raise NotImplementedError
-
-    def eval(self):
-        raise NotImplementedError
-
-    def train(self):
-        raise NotImplementedError
