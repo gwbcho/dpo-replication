@@ -143,9 +143,6 @@ class IQNActor(tf.Module):
 
         return tf.math.reduce_mean(eltwise_loss)
 
-    def update_actor(self, state_batch, critic_target, value_target, target_policy_q):
-        return
-
 
 class AutoRegressiveStochasticActor(IQNActor):
     def __init__(self, state_dim, action_dim, n_basis_functions):

@@ -224,11 +224,10 @@ class GACAgent:
         return tf.gather_nd(tiled_results, order_index, dim)
 
     # TODO: implement the following functions
-    def policy(self, actor, state):
-        raise NotImplementedError
-
     def update_critic(self, state_batch, action_batch, reward_batch, mask_batch, next_state_batch):
         raise NotImplementedError
+
+    def update_actor(self, state_batch):
 
     def soft_update(self):
         raise NotImplementedError
