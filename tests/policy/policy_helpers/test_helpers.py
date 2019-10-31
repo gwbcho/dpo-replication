@@ -1,6 +1,8 @@
 import tensorflow as tf
-from policy.policy_helpers.helpers import ActionSampler
-from policy.gac.gac_networks import AutoRegressiveStochasticActor
+
+from policy.policy_helpers.helper_classes import ActionSampler
+from policy.gac.networks import AutoRegressiveStochasticActor
+
 
 def test_ActionSampler():
     asampler = ActionSampler(4)

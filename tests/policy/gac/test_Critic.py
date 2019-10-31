@@ -1,6 +1,8 @@
-from policy.gac.gac_networks import Value, Critic
-from policy.policy_helpers.helpers import Transition
 import tensorflow as tf
+
+from policy.gac.networks import Value, Critic
+from policy.policy_helpers.helper_classes import Transition
+
 
 critic = Critic(3+4, 2)
 value = Value(3, 1)
