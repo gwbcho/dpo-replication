@@ -332,6 +332,9 @@ class Critic(tf.Module):
         self.action_dim = action_dim
         self.model = _build_sequential_model(state_dim+action_dim)
 
+    def __call__(self, states, actions):
+        x = tf.concat([states, actions], -1)
+        return self.model.predict(x)
 
     def train(self, transitions, value, gamma):
         """
@@ -351,21 +354,22 @@ class Critic(tf.Module):
         return history
 
 
-    def __call__(self, states, actions):
-        x = tf.concat([states, actions], -1)
-        return self.model.predict(x)
 
 
-class Value():
+
+class Value(tf.Module):
 
     """
     Value network has the same architecture as Critic
     """
 
     def __init__(self, state_dim):
+        super(Value, self).__init__()
         self.model = _build_sequential_model(state_dim)
         self.state_dim = state_dim
 
+    def __call__(self, states):
+        return self.model.predict(states)
 
     def train(self, transitions, actor, critic1, critic2, action_samples = 64):
         """
@@ -418,8 +422,7 @@ class Value():
 
         return self.model.fit(v_pred, v_critic)
 
-    def __call__(self, states):
-        return self.model.predict(states)
+
 
 
 class ReplayBuffer:
