@@ -338,18 +338,18 @@ class Critic(tf.Module):
     '''
     def __init__(self, state_dim, num_networks=1):
         super(Critic, self).__init__()
-        self.num_networks = num_networks
         self.state_dim = state_dim
-        self.q1 = self.build()
-        if self.num_networks == 2:
-            self.q2 = self.build()
-        elif self.num_networks > 2 or self.num_networks < 1:
-            raise NotImplementedError
+        self.action_dim = action_dim
+        self.model = self._build_sequential_model(state_dim+action_dim)
 
-    def build(self):
+    def __call__(self, states, actions):
+        x = tf.concat([states, actions], -1)
+        return self.model.predict(x)
+
+    def _build_sequential_model(input_dim):
         # A helper function for building the graph
         model = Sequential()
-        model.add(Dense(units=400, input_shape=(self.state_dim,), activation=tf.nn.leaky_relu))
+        model.add(Dense(units=400, input_shape=(input_dim,), activation=tf.nn.leaky_relu))
         model.add(Dense(units=300, activation=tf.nn.leaky_relu))
         model.add(Dense(units=1))
         model.compile(optimizer='adam', loss='mse')
@@ -378,68 +378,77 @@ class Critic(tf.Module):
             return history1
 
 
-    def __call__(self, x):
-        # This function returns the value of the forward path given input x
-        if self.num_networks == 1:
-            return self.q1.predict(x)
-        else:
-            return self.q1.predict(x), self.q2.predict(x)
-
-
-class Value(Critic):
+class Value(tf.Module):
 
     """
     Value network has the same architecture as Critic
     """
 
-    def __init__(self, state_dim, num_networks=1):
-        super(Value, self).__init__(state_dim, num_networks)
+    def __init__(self, state_dim):
+        super(Value, self).__init__()
+        self.model = self._build_sequential_model(state_dim)
+        self.state_dim = state_dim
 
-    def train(self, transitions, action_sampler, actor, critic, K):
+    def __call__(self, states):
+        return self.model.predict(states)
+
+    def _build_sequential_model(input_dim):
+        # A helper function for building the graph
+        # model functions should be constructed separately to preserve modular design
+        model = Sequential()
+        model.add(Dense(units=400, input_shape=(input_dim,), activation=tf.nn.leaky_relu))
+        model.add(Dense(units=300, activation=tf.nn.leaky_relu))
+        model.add(Dense(units=1))
+        model.compile(optimizer='adam', loss='mse')
+        return model
+
+    def train(self, transitions, actor, critic1, critic2, action_samples = 64):
         """
         transitions is of type named tuple policy.policy_helpers.helpers.Transition
         action_sampler is of type policy.policy_helpers.helpers.ActionSampler
         """
 
-        """Each state needs K action samples"""
-        # [batch size , 1 , state dim]
-        states = tf.expand_dims(transitions.s, 1)
-        # [batch size , K , state dim]
-        states = tf.broadcast_to(states, [states.shape[0], K] + states.shape[2:])
-        # [batch size x K , state dim]
+        """Each state needs action_samples action samples"""
+
+        #TODO: this tiling part is pretty dangerous. NEED DOUBLE CHECK!
+        # note from Greg: I think I've implemented a version of their tiling function
+        # please review it (_tile) to see if this is a more faithful version
+
+        # originally, transitions.s is [batch_size , state_dim]
+        states = tf.expand_dims(transitions.s, 1) # [batch_size , 1 , state_dim]
+        states = tf.broadcast_to(states, [states.shape[0], action_samples] + states.shape[2:])
+        # [batch_size , action_samples , state dim]
         states = tf.reshape(states, [-1, self.state_dim])
+        # [batch_size x action_samples , state dim]
 
 
         """
         Line 13 of Algorithm 2.
         Sample actions from the actor network given current state and tau ~ U[0,1].
         """
-        actions = action_sampler.get_actions(actor, states)
+        batch_size = transitions.s.shape[0]
+        taus = tf.random.uniform(shape=((batch_size, actor.action_dim)))
+        actions = actor(states, taus)
 
         """
         Line 14 of Algorithm 2.
         Get the Q value of the states and action samples.
         """
-        Q1, Q2 = critic(
-            tf.concat([states, actions], -1)
-        )
-        Q1 = tf.reshape(Q1, [-1, K, 1])
-        Q2 = tf.reshape(Q2, [-1, K, 1])
+        Q1, Q2 = critic1(states, actions), critic2(states, actions)
+        Q1 = tf.reshape(Q1, [-1, action_samples, 1])
+        Q2 = tf.reshape(Q2, [-1, action_samples, 1])
 
         """
         Line 14 of Algorithm 2.
         Sum over all action samples for Q1, Q2 and take the minimum.
         """
-        v1 = tf.reduce_sum(Q1, 1, keepdims=True)
-        v2 = tf.reduce_sum(Q2, 1, keepdims=True)
-        v_true = tf.reduce_min(
-            tf.concat([v1, v2], 1),
-            1,
-        )
+        v1 = tf.reduce_mean(Q1, 1) #(batch_size, 1)
+        v2 = tf.reduce_mean(Q2, 1) #(batch_size, 1)
+        v_critic = tf.minimum(v1, v2) #(batch_size, 1) this is the value from critics
 
         """
         Line 15 of Algorithm 2.
         Get value of current state from the Value network.
         Loss is MSE.
         """
-        return self.q1.fit(transitions.s, v_true)
+        return self.model.fit(transitions.s, v_critic)
