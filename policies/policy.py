@@ -6,7 +6,7 @@ import tensorflow as tf
 import utils.utils as utils
 
 # import local dependencies
-import policies.gac.gac_networks as gac_networks
+import policies.gac.networks as networks
 import policies.policy_helpers.helpers as policy_helpers
 import policies.policy_helpers.helper_classes as policy_helper_classes
 
@@ -15,7 +15,7 @@ import policies.policy_helpers.helper_classes as policy_helper_classes
 File Description:
 
 This file hosts the GACAgent class which is a form of policy. The purpose of this class is to
-unify the networks constructed for GAC in gac_networks and construct a generator function which
+unify the networks constructed for GAC in networks and construct a generator function which
 follows an optimal stationary stochastic policy.
 """
 
@@ -74,34 +74,34 @@ class GACAgent:
             self.target_policy_q = lambda x, y: (x + y / 2)
 
         if self.autoregressive:
-            self.actor = gac_networks.AutoRegressiveStochasticActor(
+            self.actor = networks.AutoRegressiveStochasticActor(
                 self.state_dim,
                 self.action_dim,
                 self.num_basis_functions
             )
-            self.actor_target = gac_networks.AutoRegressiveStochasticActor(
+            self.actor_target = networks.AutoRegressiveStochasticActor(
                 self.state_dim,
                 self.action_dim,
                 self.num_basis_functions
             )
-            self.actor_perturbed = gac_networks.AutoRegressiveStochasticActor(
+            self.actor_perturbed = networks.AutoRegressiveStochasticActor(
                 self.state_dim,
                 self.action_dim,
                 self.num_basis_functions
             )
 
         else:
-            self.actor = gac_networks.StochasticActor(
+            self.actor = networks.StochasticActor(
                 self.state_dim,
                 self.action_dim,
                 self.num_basis_functions
             )
-            self.actor_target = gac_networks.StochasticActor(
+            self.actor_target = networks.StochasticActor(
                 self.state_dim,
                 self.action_dim,
                 self.num_basis_functions
             )
-            self.actor_perturbed = gac_networks.StochasticActor(
+            self.actor_perturbed = networks.StochasticActor(
                 self.state_dim,
                 self.action_dim,
                 self.num_basis_functions
@@ -109,12 +109,12 @@ class GACAgent:
 
         self.actor_optimizer = tf.keras.optimizers.Adam(learning_rate=1e-3)
 
-        self.critic = gac_networks.Critic(self.state_dim + self.action_dim, num_networks=2)
-        self.critic_target = gac_networks.Critic(self.state_dim + self.action_dim, num_networks=2)
+        self.critic = networks.Critic(self.state_dim + self.action_dim, num_networks=2)
+        self.critic_target = networks.Critic(self.state_dim + self.action_dim, num_networks=2)
         self.critic_optimizer = tf.keras.optimizers.Adam(learning_rate=1e-3)
 
-        self.value = gac_networks.Value(self.state_dim)
-        self.value_target = gac_networks.Value(self.state_dim)
+        self.value = networks.Value(self.state_dim)
+        self.value_target = networks.Value(self.state_dim)
         self.value_optimizer = tf.keras.optimizers.Adam(learning_rate=1e-3)
 
     def select_action(self, state, action_noise=None, param_noise=None):
