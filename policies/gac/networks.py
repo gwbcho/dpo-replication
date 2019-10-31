@@ -105,14 +105,14 @@ class IQNSuperClass(tf.Module):
 
 
 class AutoRegressiveStochasticActor(IQNSuperClass):
-    def __init__(self, num_inputs, action_dim, n_basis_functions):
+    def __init__(self, state_dim, action_dim, n_basis_functions):
         """
         the autoregressive stochastic actor is an implicit quantile network used to sample from a
         distribution over optimal actions. The model maintains it's autoregressive quality due to
         the recurrent network used.
 
         Class Args:
-            num_inputs (int): number of inputs used for state embedding, I think this is state dim?
+            state_dim (int): number of inputs used for state embedding, I think this is state dim?
             action_dim (int): the dimensionality of the action vector
             n_basis_functions (int): the number of basis functions
         """
@@ -143,7 +143,7 @@ class AutoRegressiveStochasticActor(IQNSuperClass):
         forward pass of the AIQN given the state.
 
         Args:
-            state (tf.Variable): state vector containing a state with the format R^num_inputs
+            state (tf.Variable): state vector containing a state with the format R^state_dim
             taus (tf.Variable): randomly sampled noise vector for sampling purposes. This vector
                 should be of shape (batch_size x actor_dimension x 1)
             actions (tf.Variable): set of previous actions
@@ -252,7 +252,7 @@ class StochasticActor(IQNSuperClass):
     def __call__(self, states, taus):
         """
         Args:
-            state: tensor (batch_size, num_inputs)
+            state: tensor (batch_size, state_dim)
             taus: tensor (batch_size, action_dim)
         Return:
             next_actions: tensor (batch_size, action_dim)
@@ -276,13 +276,13 @@ class Critic(tf.Module):
     400, 300, and 1. All are fully connected layers.
 
     Class Args:
-    num_inputs (int): number of states
+    state_dim (int): number of states
     num_networks (int): number of critc networks need to be created
     '''
-    def __init__(self, num_inputs, num_networks=1):
+    def __init__(self, state_dim, num_networks=1):
         super(Critic, self).__init__()
         self.num_networks = num_networks
-        self.num_inputs = num_inputs
+        self.state_dim = state_dim
         self.q1 = self.build()
         if self.num_networks == 2:
             self.q2 = self.build()
@@ -292,7 +292,7 @@ class Critic(tf.Module):
     def build(self):
         # A helper function for building the graph
         model = Sequential()
-        model.add(Dense(units=400, input_shape=(self.num_inputs,), activation=tf.nn.leaky_relu))
+        model.add(Dense(units=400, input_shape=(self.state_dim,), activation=tf.nn.leaky_relu))
         model.add(Dense(units=300, activation=tf.nn.leaky_relu))
         model.add(Dense(units=1))
         model.compile(optimizer='adam', loss='mse')
@@ -335,8 +335,8 @@ class Value(Critic):
     Value network has the same architecture as Critic
     """
 
-    def __init__(self, num_inputs, num_networks=1):
-        super(Value, self).__init__(num_inputs, num_networks)
+    def __init__(self, state_dim, num_networks=1):
+        super(Value, self).__init__(state_dim, num_networks)
 
     def train(self, transitions, action_sampler, actor, critic, K):
         """
@@ -350,7 +350,7 @@ class Value(Critic):
         # [batch size , K , state dim]
         states = tf.broadcast_to(states, [states.shape[0], K] + states.shape[2:])
         # [batch size x K , state dim]
-        states = tf.reshape(states, [-1, self.num_inputs])
+        states = tf.reshape(states, [-1, self.state_dim])
 
 
         """
