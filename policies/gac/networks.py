@@ -1,8 +1,8 @@
+import numpy as np
 import tensorflow as tf
 from tensorflow.keras import Sequential
 from tensorflow.keras.layers import Dense
 
-from policies.gac.helpers import cosine_basis_functions
 
 """
 File Description:
@@ -15,34 +15,47 @@ classes, if for no other reason than legibility.
 
 
 class CosineBasisLinear(tf.Module):
-    def __init__(self, n_basis_functions, out_size):
+    def __init__(self, n_basis_functions, embed_dim):
         """
-        Parametrize the embeding function using Fourier series up to n_basis_functions terms.
+        Parametrize the embedding function using Fourier series up to n_basis_functions terms.
         It's an entry-wise embedding function, i.e. from R to R^d.
         Class Args:
             n_basis_functions (int): the number of basis functions
-            out_size (int): the dimensionality of embedding
+            embed_dim (int): the dimensionality of embedding
         """
         super(CosineBasisLinear, self).__init__()
-        self.act_linear = tf.keras.layers.Dense(
-            out_size,
-            input_shape = (n_basis_functions,)
-        )
+        # coefficient of the basis
+        self.act_linear = tf.keras.layers.Dense(embed_dim,input_shape = (n_basis_functions,))
         self.n_basis_functions = n_basis_functions
-        self.out_size = out_size
+        self.embed_dim = embed_dim
+
+    def _cosine_basis_functions(self, x, n_basis_functions=64):
+        """
+        Cosine basis function (the function is denoted as psi in the paper). This is used to embed
+        [0, 1] -> R^d. The i th component of output is cos(i*x).
+
+        Args:
+            x (tf.Variable)
+            n_basis_functions (int): number of basis function for the
+        """
+        x = tf.reshape(x, (-1, 1))
+        i_pi = np.tile(np.arange(1, n_basis_functions + 1, dtype=np.float32), (x.shape[0], 1)) * np.pi
+        i_pi = tf.convert_to_tensor(i_pi)
+        embedding = tf.math.cos(x * i_pi)
+        return embedding
 
     def __call__(self, x):
         """
         Args:
             x: tensor (batch_size, a), a is arbitrary, e.g. dimensionality of action vector.
         Return:
-            out: tensor (batch_size, a, out_size): the embedding vector phi(x).
+            out: tensor (batch_size, a, embed_dim): the embedding vector phi(x).
         """
         batch_size = x.shape[0]
-        h = cosine_basis_functions(x, self.n_basis_functions)
+        h = self._cosine_basis_functions(x, self.n_basis_functions)
             # (size of x , n_basis_functions)
-        out = self.act_linear(h) # (size of x , out_size)
-        out = tf.reshape(out, (batch_size, -1, self.out_size))
+        out = self.act_linear(h) # (size of x , embed_dim)
+        out = tf.reshape(out, (batch_size, -1, self.embed_dim))
         return out
 
 
@@ -105,14 +118,14 @@ class IQNSuperClass(tf.Module):
 
 
 class AutoRegressiveStochasticActor(IQNSuperClass):
-    def __init__(self, num_inputs, action_dim, n_basis_functions):
+    def __init__(self, state_dim, action_dim, n_basis_functions):
         """
         the autoregressive stochastic actor is an implicit quantile network used to sample from a
         distribution over optimal actions. The model maintains it's autoregressive quality due to
         the recurrent network used.
 
         Class Args:
-            num_inputs (int): number of inputs used for state embedding, I think this is state dim?
+            state_dim (int): number of inputs used for state embedding, I think this is state dim?
             action_dim (int): the dimensionality of the action vector
             n_basis_functions (int): the number of basis functions
         """
@@ -143,7 +156,7 @@ class AutoRegressiveStochasticActor(IQNSuperClass):
         forward pass of the AIQN given the state.
 
         Args:
-            state (tf.Variable): state vector containing a state with the format R^num_inputs
+            state (tf.Variable): state vector containing a state with the format R^state_dim
             taus (tf.Variable): randomly sampled noise vector for sampling purposes. This vector
                 should be of shape (batch_size x actor_dimension x 1)
             actions (tf.Variable): set of previous actions
@@ -252,7 +265,7 @@ class StochasticActor(IQNSuperClass):
     def __call__(self, states, taus):
         """
         Args:
-            state: tensor (batch_size, num_inputs)
+            state: tensor (batch_size, state_dim)
             taus: tensor (batch_size, action_dim)
         Return:
             next_actions: tensor (batch_size, action_dim)
@@ -276,13 +289,13 @@ class Critic(tf.Module):
     400, 300, and 1. All are fully connected layers.
 
     Class Args:
-    num_inputs (int): number of states
+    state_dim (int): number of states
     num_networks (int): number of critc networks need to be created
     '''
-    def __init__(self, num_inputs, num_networks=1):
+    def __init__(self, state_dim, num_networks=1):
         super(Critic, self).__init__()
         self.num_networks = num_networks
-        self.num_inputs = num_inputs
+        self.state_dim = state_dim
         self.q1 = self.build()
         if self.num_networks == 2:
             self.q2 = self.build()
@@ -292,7 +305,7 @@ class Critic(tf.Module):
     def build(self):
         # A helper function for building the graph
         model = Sequential()
-        model.add(Dense(units=400, input_shape=(self.num_inputs,), activation=tf.nn.leaky_relu))
+        model.add(Dense(units=400, input_shape=(self.state_dim,), activation=tf.nn.leaky_relu))
         model.add(Dense(units=300, activation=tf.nn.leaky_relu))
         model.add(Dense(units=1))
         model.compile(optimizer='adam', loss='mse')
@@ -335,8 +348,8 @@ class Value(Critic):
     Value network has the same architecture as Critic
     """
 
-    def __init__(self, num_inputs, num_networks=1):
-        super(Value, self).__init__(num_inputs, num_networks)
+    def __init__(self, state_dim, num_networks=1):
+        super(Value, self).__init__(state_dim, num_networks)
 
     def train(self, transitions, action_sampler, actor, critic, K):
         """
@@ -350,7 +363,7 @@ class Value(Critic):
         # [batch size , K , state dim]
         states = tf.broadcast_to(states, [states.shape[0], K] + states.shape[2:])
         # [batch size x K , state dim]
-        states = tf.reshape(states, [-1, self.num_inputs])
+        states = tf.reshape(states, [-1, self.state_dim])
 
 
         """
