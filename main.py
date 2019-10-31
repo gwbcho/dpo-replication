@@ -99,12 +99,14 @@ def main():
     """
     Create actor, critic, value and their targets
     """
-    ActorClass = AIQN if args.auto_regressive else IQN
-    actor = ActorClass(action_dim)
-    critic = Critic(state_dim+action_dim, num_networks=2)
+    Actor = AIQN if args.auto_regressive else IQN
+    actor = Actor(action_dim)
+    critic1 = Critic(state_dim, action_dim)
+    critic2 = Critic(state_dim, action_dim)
     value = Value(state_dim)
-    target_actor = ActorClass(action_dim)
-    target_critic = Critic(state_dim+action_dim, num_networks=2)
+    target_actor = Actor(action_dim)
+    target_critic1 = Critic(state_dim, action_dim)
+    target_critic2 = Critic(state_dim, action_dim)
     target_value = Value(state_dim)
 
 

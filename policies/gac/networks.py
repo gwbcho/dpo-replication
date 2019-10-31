@@ -299,23 +299,15 @@ class Critic(tf.Module):
 
     Class Args:
     state_dim (int): number of states
-    num_networks (int): number of critc networks need to be created
     '''
-    def __init__(self, state_dim, num_networks=1):
+    def __init__(self, state_dim, action_dim):
         super(Critic, self).__init__()
-        self.num_networks = num_networks
-        self.state_dim = state_dim
-        self.q1 = _build_sequential_model(state_dim)
-        if self.num_networks == 2:
-            self.q2 = _build_sequential_model(state_dim)
-        elif self.num_networks > 2 or self.num_networks < 1:
-            raise NotImplementedError
+        self.model = _build_sequential_model(state_dim+action_dim)
 
 
     def train(self, transitions, value, gamma):
         """
         transitions is of type named tuple policies.policy_helpers.helpers.Transition
-        q1, q2 are seperate Q networks, thus can be trained separately
         """
 
         """
@@ -327,20 +319,13 @@ class Critic(tf.Module):
         Line 11-12 of Algorithm 2
         """
         x = tf.concat([transitions.s, transitions.a], -1)
-        history1 = self.q1.fit(x, Q)
-        if self.num_networks == 2:
-            history2 = self.q2.fit(x, Q)
-            return history1, history2
-        else:
-            return history1
+        history = self.model.fit(x, Q)
+        return history
 
 
     def __call__(self, states, actions):
         x = tf.concat([states, actions], -1)
-        if self.num_networks == 1:
-            return self.q1.predict(x)
-        else:
-            return self.q1.predict(x), self.q2.predict(x)
+        return self.model.predict(x)
 
 
 class Value():
@@ -354,7 +339,7 @@ class Value():
         self.state_dim = state_dim
 
 
-    def train(self, transitions, action_sampler, actor, critic, K):
+    def train(self, transitions, action_sampler, actor, critic1, critic2, K):
         """
         transitions is of type named tuple policies.policy_helpers.helpers.Transition
         action_sampler is of type policies.policy_helpers.helpers.ActionSampler
@@ -379,7 +364,7 @@ class Value():
         Line 14 of Algorithm 2.
         Get the Q value of the states and action samples.
         """
-        Q1, Q2 = critic(states, actions)
+        Q1, Q2 = critic1(states, actions), critic2(states, actions)
         Q1 = tf.reshape(Q1, [-1, K, 1])
         Q2 = tf.reshape(Q2, [-1, K, 1])
 
