@@ -418,9 +418,8 @@ class Value(tf.Module):
         Get value of current state from the Value network.
         Loss is MSE.
         """
-        v_pred = self(transitions.s) #(batch_size, 1)
-
-        return self.model.fit(v_pred, v_critic)
+        
+        return self.model.fit(transitions.s, v_critic)
 
 
 
