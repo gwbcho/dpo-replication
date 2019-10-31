@@ -1,38 +1,57 @@
-# external dependencies
+# import external dependencies
 import numpy as np
 import tensorflow as tf
 
 # internal dependencies
-import policies.policy_helpers.helpers as helpers
-import policies.policy_helpers.helper_classes as helper_classes
 import utils.utils as utils
+
+# import local dependencies
+import policies.gac.gac_helpers as gac_helpers
+import policies.gac.gac_networks as gac_networks
+import policies.policy_helpers.helpers as policy_helpers
+import policies.policy_helpers.helper_classes as policy_helper_classes
+
 
 """
 File Description:
 
-This file contains the Policy class which is the parent for all policies in this project. It's meant
-to contain bare bones functionality to be modified after it's instantiation.
+This file hosts the GACAgent class which is a form of policy. The purpose of this class is to
+unify the networks constructed for GAC in gac_networks and construct a generator function which
+follows an optimal stationary stochastic policy.
 """
 
 
-class Policy(helper_classes.HelperPolicyClass):
+class GACAgent:
     """
-    Policy function for bare bones RL
+    Class to construct a generative policy which samples from an optimally constructed
+    distribution over continuous action space.
     """
 
-    def __init__(self, gamma, tau, num_inputs, action_space, replay_size, normalize_obs=True,
-                 normalize_returns=False):
-        super(Policy, self).__init__()
-        self.num_inputs = num_inputs
+    def __init__(self, gamma, soft_update_rate, state_dim, action_space, replay_size,
+                 normalize_obs=False, normalize_returns=False, num_basis_functions=64,
+                 num_outputs=1, use_value=True, q_normalization=0.01, target_policy='linear',
+                 target_policy_q='min', autoregressive=True, temp=1.0):
+
+        # TODO: Construct function as specified in the paper
+        self.state_dim = state_dim
         self.action_space = action_space
+        self.num_outputs = num_outputs
+        self.num_basis_functions = num_basis_functions
+        self.action_dim = self.action_space.shape[0]
+        self.use_value = use_value
+        self.q_normalization = q_normalization
+        self.target_policy = target_policy
+        self.autoregressive = autoregressive
+        self.temp = temp
 
+        # initial Policy class initialized values
         self.gamma = gamma
-        self.tau = tau
+        self.soft_update_rate = soft_update_rate
         self.normalize_observations = normalize_obs
         self.normalize_returns = normalize_returns
 
         if self.normalize_observations:
-            self.obs_rms = utils.RunningMeanStd(shape=num_inputs)
+            self.obs_rms = utils.RunningMeanStd(shape=state_dim)
         else:
             self.obs_rms = None
 
@@ -43,13 +62,64 @@ class Policy(helper_classes.HelperPolicyClass):
         else:
             self.ret_rms = None
 
-        self.memory = helper_classes.ReplayMemory(replay_size)
+        self.memory = policy_helper_classes.ReplayMemory(replay_size)
         self.actor = None
         self.actor_perturbed = None
-        self.policy = helper_classes.ActionSampler(self.action_space)
+        self.policy = policy_helper_classes.ActionSampler(self.action_dim)
+
+        if target_policy_q == 'min':
+            self.target_policy_q = lambda x, y: tf.math.minimum(x, y)
+        elif target_policy_q == 'max':
+            self.target_policy_q = lambda x, y: tf.math.minimum(x, y)
+        else:
+            self.target_policy_q = lambda x, y: (x + y / 2)
+
+        if self.autoregressive:
+            self.actor = gac_networks.AutoRegressiveStochasticActor(
+                self.state_dim,
+                self.action_dim,
+                self.num_basis_functions
+            )
+            self.actor_target = gac_networks.AutoRegressiveStochasticActor(
+                self.state_dim,
+                self.action_dim,
+                self.num_basis_functions
+            )
+            self.actor_perturbed = gac_networks.AutoRegressiveStochasticActor(
+                self.state_dim,
+                self.action_dim,
+                self.num_basis_functions
+            )
+
+        else:
+            self.actor = gac_networks.StochasticActor(
+                self.state_dim,
+                self.action_dim,
+                self.num_basis_functions
+            )
+            self.actor_target = gac_networks.StochasticActor(
+                self.state_dim,
+                self.action_dim,
+                self.num_basis_functions
+            )
+            self.actor_perturbed = gac_networks.StochasticActor(
+                self.state_dim,
+                self.action_dim,
+                self.num_basis_functions
+            )
+
+        self.actor_optimizer = tf.keras.optimizers.Adam(learning_rate=1e-3)
+
+        self.critic = gac_networks.Critic(self.state_dim + self.action_dim, num_networks=2)
+        self.critic_target = gac_networks.Critic(self.state_dim + self.action_dim, num_networks=2)
+        self.critic_optimizer = tf.keras.optimizers.Adam(learning_rate=1e-3)
+
+        self.value = gac_networks.Value(self.state_dim)
+        self.value_target = gac_networks.Value(self.state_dim)
+        self.value_optimizer = tf.keras.optimizers.Adam(learning_rate=1e-3)
 
     def select_action(self, state, action_noise=None, param_noise=None):
-        state = helpers.normalize(
+        state = policy_helpers.normalize(
             tf.Variable(state),
             self.obs_rms
         )
@@ -80,9 +150,9 @@ class Policy(helper_classes.HelperPolicyClass):
 
     def update_parameters(self, batch_size):
         transitions = self.memory.sample(batch_size)
-        batch = helper_classes.Transition(*zip(*transitions))
+        batch = policy_helper_classes.Transition(*zip(*transitions))
 
-        state_batch = helpers.normalize(
+        state_batch = policy_helpers.normalize(
             tf.Variable(
                 tf.stack(batch.state)
             ),
@@ -90,7 +160,7 @@ class Policy(helper_classes.HelperPolicyClass):
         )
 
         action_batch = tf.Variable(tf.stack(batch.action))
-        reward_batch = helpers.normalize(
+        reward_batch = policy_helpers.normalize(
             tf.Variable(
                 tf.expand_dims(
                     tf.stack(batch.reward),
@@ -105,7 +175,7 @@ class Policy(helper_classes.HelperPolicyClass):
                 1
             )
         )
-        next_state_batch = helpers.normalize(
+        next_state_batch = policy_helpers.normalize(
             tf.Variable(
                 tf.stack(batch.next_state)
             ),
@@ -132,7 +202,7 @@ class Policy(helper_classes.HelperPolicyClass):
         """
         Apply parameter noise to actor model, for exploration
         """
-        helpers.hard_update(self.actor_perturbed, self.actor)
+        policy_helpers.hard_update(self.actor_perturbed, self.actor)
         params = self.actor_perturbed.state_dict()
         for name in params:
             if 'ln' in name:
@@ -153,3 +223,16 @@ class Policy(helper_classes.HelperPolicyClass):
             dtype=tf.int64
         )
         return tf.gather_nd(tiled_results, order_index, dim)
+
+    # TODO: implement the following functions
+    def policy(self, actor, state):
+        raise NotImplementedError
+
+    def update_critic(self, state_batch, action_batch, reward_batch, mask_batch, next_state_batch):
+        raise NotImplementedError
+
+    def soft_update(self):
+        raise NotImplementedError
+
+    def eval(self):
+        raise NotImplementedError
