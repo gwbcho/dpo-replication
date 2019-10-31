@@ -1,9 +1,8 @@
-# import external dependencies
 import tensorflow as tf
 from tensorflow.keras import Sequential
 from tensorflow.keras.layers import Dense
-# import internal dependencies
-import policies.gac.gac_helpers.helpers as helpers
+
+from policies.gac.helpers import cosine_basis_functions
 
 """
 File Description:
@@ -16,18 +15,17 @@ classes, if for no other reason than legibility.
 
 
 class CosineBasisLinear(tf.Module):
-    def __init__(self, n_basis_functions, out_size, activation = None):
+    def __init__(self, n_basis_functions, out_size):
         """
         Parametrize the embeding function using Fourier series up to n_basis_functions terms.
         It's an entry-wise embedding function, i.e. from R to R^d.
         Class Args:
             n_basis_functions (int): the number of basis functions
             out_size (int): the dimensionality of embedding
-            activation: activation function before output
         """
         super(CosineBasisLinear, self).__init__()
         self.act_linear = tf.keras.layers.Dense(
-            out_size, activation = activation,
+            out_size,
             input_shape = (n_basis_functions,)
         )
         self.n_basis_functions = n_basis_functions
@@ -41,7 +39,7 @@ class CosineBasisLinear(tf.Module):
             out: tensor (batch_size, a, out_size): the embedding vector phi(x).
         """
         batch_size = x.shape[0]
-        h = helpers.cosine_basis_functions(x, self.n_basis_functions)
+        h = cosine_basis_functions(x, self.n_basis_functions)
             # (size of x , n_basis_functions)
         out = self.act_linear(h) # (size of x , out_size)
         out = tf.reshape(out, (batch_size, -1, self.out_size))
@@ -233,63 +231,42 @@ class AutoRegressiveStochasticActor(IQNSuperClass):
 
 
 class StochasticActor(IQNSuperClass):
-    def __init__(self, num_inputs, action_dim, n_basis_functions):
+    def __init__(self, action_dim, n_basis_functions=64):
         """
         The IQN stochasitc action generator, takes state and tau (random vector) as input, and output
         the next action. This generator is not in an autoregressive way, i.e. the next action is
         generated as a whole, instead of one dimension by one dimension.
 
         Class Args:
-            num_inputs (int): the dimensionality of the state vector
             action_dim (int): the dimensionality of the action vector
             n_basis_functions (int): the number of basis functions for noise embedding.
         """
         super(StochasticActor, self).__init__()
-        self.module_type = 'StochasticActor'
-        hidden_size = int(400 / action_dim)
-        self.hidden_size = hidden_size
-        self.action_dim = action_dim
-        self.l1 = tf.keras.layers.Dense(
-            self.hidden_size * self.action_dim,
-            activation=tf.keras.layers.LeakyReLU(alpha=0.01),
-            input_shape = (num_inputs,)
-        )
-        self.phi = CosineBasisLinear(
-            n_basis_functions,
-            self.hidden_size,
-            activation= tf.keras.layers.LeakyReLU(alpha=0.01)
-        )
-        self.l2 = tf.keras.layers.Dense(
-            200,
-            activation= tf.keras.layers.LeakyReLU(alpha=0.01),
-            input_shape = (self.hidden_size * self.action_dim,)
-        )
-        self.l3 = tf.keras.layers.Dense(
-            self.action_dim,
-            activation= tf.nn.tanh,
-            input_shape = (200,)
-        )
+        self.l1 = tf.keras.layers.Dense(420)
+        cosine_hidden_size = 420//action_dim
+        assert cosine_hidden_size * action_dim == 420
+        self.phi = CosineBasisLinear(n_basis_functions, cosine_hidden_size)
+        self.l2 = tf.keras.layers.Dense(200)
+        self.l3 = tf.keras.layers.Dense(action_dim)
 
-    def __call__(self, state, taus, actions=None):
+    def __call__(self, states, taus):
         """
         Args:
             state: tensor (batch_size, num_inputs)
             taus: tensor (batch_size, action_dim)
-            actions: tensor (batch_size, action_dim), but is not used here...
         Return:
             next_actions: tensor (batch_size, action_dim)
         """
-        state_embedding = self.l1(state) # (batch_size, self.hidden_size * self.action_dim)
-        noise_embedding = self.phi(taus) # (batch_size, self.action_dim, self.hidden_size)
+        state_embedding = tf.keras.layers.LeakyReLU(self.l1(states)) # (batch_size, self.hidden_size * self.action_dim)
+        noise_embedding = tf.keras.layers.LeakyReLU(self.phi(taus)) # (batch_size, self.action_dim, self.hidden_size)
         # again, phi (CosineBasisLinear) is an entry-wise embedding.
-        noise_embedding = tf.reshape(noise_embedding, (-1, self.hidden_size * self.action_dim))
+        noise_embedding = tf.reshape(noise_embedding, (-1, 420))
                         # (batch_size, self.hidden_size * self.action_dim)
         hadamard_product = state_embedding * noise_embedding
                         # (batch_size, self.hidden_size * self.action_dim)
-        l2 = self.l2(hadamard_product)  #(batch_size, 200)
-        next_actions = self.l3(l2) # (batch_size, self.action_dim)
-
-        return next_actions
+        l2 = tf.keras.layers.LeakyReLU(self.l2(hadamard_product))  #(batch_size, 200)
+        actions = tf.tanh(self.l3(l2)) # (batch_size, self.action_dim)
+        return actions
 
 
 class Critic(tf.Module):

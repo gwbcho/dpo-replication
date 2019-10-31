@@ -1,10 +1,14 @@
 import os
 import argparse
 
+import gym
 import numpy as np
 import tensorflow as tf
 
-import policies.gac as gac
+from policies.gac.networks import AutoRegressiveStochasticActor as AIQN
+from policies.gac.networks import StochasticActor as IQN
+from policies.gac.networks import Critic, Value
+
 
 def create_argument_parser():
     parser = argparse.ArgumentParser(
@@ -36,12 +40,12 @@ def create_argument_parser():
     parser.add_argument('--replay_size', type=int, default=1000000, metavar='N',
             help='size of replay buffer (default: 1000000)')
     parser.add_argument('--policy_type', default='ddpg', choices=['ddpg', 'generative'])
-    parser.add_argument('--ddpg_outputs', type=int, default=1, help='Number of outputs for DDPG model.')
+    parser.add_argument('--num_outputs', type=int, default=1)
     parser.add_argument('--visualize', default=False, action='store_true')
     parser.add_argument('--experiment_name', default=None, type=str,
             help='For multiple different experiments, provide an informative experiment name')
     parser.add_argument('--print', default=False, action='store_true')
-    parser.add_argument('--autoregressive', default=False, action='store_true')
+    parser.add_argument('--auto-regressive', default=False, action='store_true')
     parser.add_argument('--normalize_obs', default=False, action='store_true', help='Normalize observations')
     parser.add_argument('--normalize_rewards', default=False, action='store_true', help='Normalize rewards')
     parser.add_argument('--q_normalization', type=float, default=0.01,
@@ -53,6 +57,9 @@ def create_argument_parser():
     parser.add_argument('--boltzman_temperature', type=float, default=1.0,
             help='Boltzman Temperature for normalizing actions')
     return parser
+
+
+
 
 def evaluate_policy(policy, env, episodes):
     """
@@ -81,6 +88,26 @@ def train(args):
 
 def main():
     args = create_argument_parser().parse_args()
+
+    """
+    Create Mujoko environment
+    """
+    env = gym.make(args.environment)
+    action_dim = env.action_space.shape[0]
+    state_dim = env.observation_space.shape[0]
+
+    """
+    Create actor, critic, value and their targets
+    """
+    ActorClass = AIQN if args.auto_regressive else IQN
+    actor = ActorClass(action_dim)
+    critic = Critic(state_dim+action_dim, num_networks=2)
+    value = Value(state_dim)
+    target_actor = ActorClass(action_dim)
+    target_critic = Critic(state_dim+action_dim, num_networks=2)
+    target_value = Value(state_dim)
+
+
     train(args)
 
 if __name__ == '__main__':
