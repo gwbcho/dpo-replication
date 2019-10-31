@@ -1,7 +1,7 @@
 import os
 import unittest
 
-import tests.unit.policies.gac.gac_networks as test_gac_networks
+import tests.unit.policy.gac_networks as test_gac_networks
 
 
 def create_and_run_test_suite(test_module):
