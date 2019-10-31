@@ -438,6 +438,7 @@ class ReplayBuffer():
         self.replay_buffer.append((this_state, this_action, this_reward, next_state, this_is_done))
 
     def sample(self, batch_size):
+        assert batch_size <= len(self.replay_buffer)
         return random.sample(self.replay_buffer,batch_size)
 
     def __len__(self):
