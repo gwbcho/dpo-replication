@@ -31,8 +31,7 @@ class CosineBasisLinear(tf.Module):
         """
         super(CosineBasisLinear, self).__init__()
         # coefficient of the basis
-        self.act_linear = tf.keras.layers.Dense(embed_dim,
-                            activation = activation, input_shape = (n_basis_functions,))
+        self.act_linear = Dense(embed_dim, activation = activation, input_shape = (n_basis_functions,))
         self.n_basis_functions = n_basis_functions
         self.embed_dim = embed_dim
 
@@ -142,7 +141,7 @@ class AutoRegressiveStochasticActor(IQNSuperClass):
         # create all necessary class variables
         self.module_type = 'AutoRegressiveStochasticActor'
         self.action_dim = action_dim
-        self.state_embedding = tf.keras.layers.Dense(
+        self.state_embedding = Dense(
             400,  # as specified by the architecture in the paper and in their code
             activation=tf.nn.leaky_relu
         )
@@ -154,10 +153,10 @@ class AutoRegressiveStochasticActor(IQNSuperClass):
         # construct the GRU to ensure autoregressive qualities of our samples
         self.rnn = tf.keras.layers.GRU(400, return_state=True, return_sequences=True)
         # post processing linear layers
-        self.dense_layer_1 = tf.keras.layers.Dense(400, activation=tf.nn.leaky_relu)
+        self.dense_layer_1 = Dense(400, activation=tf.nn.leaky_relu)
         # output layer (produces the sample from the implicit quantile function)
         # note the output is between [0, 1]
-        self.dense_layer_2 = tf.keras.layers.Dense(1, activation=tf.nn.tanh)
+        self.dense_layer_2 = Dense(1, activation=tf.nn.tanh)
 
     def __call__(self, state, taus, actions=None):
         """
@@ -269,7 +268,7 @@ class StochasticActor(IQNSuperClass):
         self.noise_embed_dim = 400 // action_dim
         self.action_dim = action_dim
 
-        self.state_embedding_layer = tf.keras.layers.Dense(
+        self.state_embedding_layer = Dense(
             self.noise_embed_dim * self.action_dim,
             activation=tf.keras.layers.LeakyReLU(alpha=0.01),
             input_shape = (state_dim,))
@@ -278,11 +277,11 @@ class StochasticActor(IQNSuperClass):
             n_basis_functions, self.noise_embed_dim,
             activation= tf.keras.layers.LeakyReLU(alpha=0.01))
             
-        self.merge_embedding_layer = tf.keras.layers.Dense(
+        self.merge_embedding_layer = Dense(
             200, activation= tf.keras.layers.LeakyReLU(alpha=0.01),
             input_shape = (self.noise_embed_dim * self.action_dim,))
 
-        self.output_action_layer = tf.keras.layers.Dense(
+        self.output_action_layer = Dense(
             self.action_dim, activation= tf.nn.tanh,
             input_shape = (200,))
 
