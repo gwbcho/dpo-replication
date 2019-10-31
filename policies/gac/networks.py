@@ -394,7 +394,7 @@ class Value(tf.Module):
         Sample actions from the actor network given current state and tau ~ U[0,1].
         """
         batch_size = transitions.s.shape[0]
-        taus = tf.random.uniform(shape=((batch_size, critic1.action_dim)))
+        taus = tf.random.uniform(shape=((batch_size, actor.action_dim)))
         actions = actor(states, taus)
 
         """
@@ -418,7 +418,7 @@ class Value(tf.Module):
         Get value of current state from the Value network.
         Loss is MSE.
         """
-        
+
         return self.model.fit(transitions.s, v_critic)
 
 
