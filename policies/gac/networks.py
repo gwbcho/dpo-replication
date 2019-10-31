@@ -426,20 +426,34 @@ class Value(Critic):
         return self.q1.fit(transitions.s, v_true)
 
 
-class ReplayBuffer():
+class ReplayBuffer:
     """
-    Buffer for transition tuple (this_state, this_action, this_reward, next_state, this_is_done).
+    A simple FIFO experience replay buffer.
+    Copied from 
+    https://github.com/openai/spinningup/blob/master/spinup/algos/sac/sac.py (with The MIT License)
     """
-    def __init__(self, capacity):
-        self.capacity = capacity
-        self.replay_buffer = deque(maxlen=self.capacity)
 
-    def push(self, this_state, this_action, this_reward, next_state, this_is_done):
-        self.replay_buffer.append((this_state, this_action, this_reward, next_state, this_is_done))
+    def __init__(self, obs_dim, act_dim, size):
+        self.obs1_buf = np.zeros([size, obs_dim], dtype=np.float32)
+        self.obs2_buf = np.zeros([size, obs_dim], dtype=np.float32)
+        self.acts_buf = np.zeros([size, act_dim], dtype=np.float32)
+        self.rews_buf = np.zeros(size, dtype=np.float32)
+        self.done_buf = np.zeros(size, dtype=np.float32)
+        self.ptr, self.size, self.max_size = 0, 0, size
 
-    def sample(self, batch_size):
-        assert batch_size <= len(self.replay_buffer)
-        return random.sample(self.replay_buffer,batch_size)
+    def store(self, obs, act, rew, next_obs, done):
+        self.obs1_buf[self.ptr] = obs
+        self.obs2_buf[self.ptr] = next_obs
+        self.acts_buf[self.ptr] = act
+        self.rews_buf[self.ptr] = rew
+        self.done_buf[self.ptr] = done
+        self.ptr = (self.ptr+1) % self.max_size
+        self.size = min(self.size+1, self.max_size)
 
-    def __len__(self):
-        return len(self.replay_buffer)
+    def sample_batch(self, batch_size=32):
+        idxs = np.random.randint(0, self.size, size=batch_size)
+        return dict(obs1=self.obs1_buf[idxs],
+                    obs2=self.obs2_buf[idxs],
+                    acts=self.acts_buf[idxs],
+                    rews=self.rews_buf[idxs],
+                    done=self.done_buf[idxs])
