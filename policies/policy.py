@@ -1,11 +1,8 @@
-# import external dependencies
 import numpy as np
 import tensorflow as tf
 
-# internal dependencies
 import utils.utils as utils
 
-# import local dependencies
 import policies.gac.networks as networks
 import policies.policy_helpers.helpers as policy_helpers
 import policies.policy_helpers.helper_classes as policy_helper_classes
