@@ -62,7 +62,7 @@ class CosineBasisLinear(tf.Module):
         h = self._cosine_basis_functions(x, self.n_basis_functions)
             # (size of x , n_basis_functions)
         out = self.act_linear(h) # (size of x , embed_dim)
-        out = tf.reshape(out, (batch_size, -1, self.embed_dim))
+        out = tf.reshape(out, (batch_size, -1, self.embed_dim)) #(batch_size, a, embed_dim)
         return out
 
 
