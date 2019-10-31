@@ -6,7 +6,6 @@ import tensorflow as tf
 import utils.utils as utils
 
 # import local dependencies
-import policies.gac.gac_helpers as gac_helpers
 import policies.gac.gac_networks as gac_networks
 import policies.policy_helpers.helpers as policy_helpers
 import policies.policy_helpers.helper_classes as policy_helper_classes
