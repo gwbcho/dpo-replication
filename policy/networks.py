@@ -336,7 +336,7 @@ class Critic(tf.Module):
     state_dim (int): number of states
     num_networks (int): number of critc networks need to be created
     '''
-    def __init__(self, state_dim, num_networks=1):
+    def __init__(self, state_dim, action_dim):
         super(Critic, self).__init__()
         self.state_dim = state_dim
         self.action_dim = action_dim
@@ -346,7 +346,7 @@ class Critic(tf.Module):
         x = tf.concat([states, actions], -1)
         return self.model.predict(x)
 
-    def _build_sequential_model(input_dim):
+    def _build_sequential_model(self, input_dim):
         # A helper function for building the graph
         model = Sequential()
         model.add(Dense(units=400, input_shape=(input_dim,), activation=tf.nn.leaky_relu))
@@ -392,7 +392,7 @@ class Value(tf.Module):
     def __call__(self, states):
         return self.model.predict(states)
 
-    def _build_sequential_model(input_dim):
+    def _build_sequential_model(self, input_dim):
         # A helper function for building the graph
         # model functions should be constructed separately to preserve modular design
         model = Sequential()
