@@ -1,8 +1,8 @@
+import numpy as np
 import tensorflow as tf
 from tensorflow.keras import Sequential
 from tensorflow.keras.layers import Dense
 
-from policies.gac.helpers import cosine_basis_functions
 
 """
 File Description:
@@ -31,6 +31,21 @@ class CosineBasisLinear(tf.Module):
         self.n_basis_functions = n_basis_functions
         self.out_size = out_size
 
+    def _cosine_basis_functions(self, x, n_basis_functions=64):
+        """
+        Cosine basis function (the function is denoted as psi in the paper). This is used to embed
+        [0, 1] -> R^d. The i th component of output is cos(i*x).
+
+        Args:
+            x (tf.Variable)
+            n_basis_functions (int): number of basis function for the
+        """
+        x = tf.reshape(x, (-1, 1))
+        i_pi = np.tile(np.arange(1, n_basis_functions + 1, dtype=np.float32), (x.shape[0], 1)) * np.pi
+        i_pi = tf.convert_to_tensor(i_pi)
+        embedding = tf.math.cos(x * i_pi)
+        return embedding
+
     def __call__(self, x):
         """
         Args:
@@ -39,7 +54,7 @@ class CosineBasisLinear(tf.Module):
             out: tensor (batch_size, a, out_size): the embedding vector phi(x).
         """
         batch_size = x.shape[0]
-        h = cosine_basis_functions(x, self.n_basis_functions)
+        h = self._cosine_basis_functions(x, self.n_basis_functions)
             # (size of x , n_basis_functions)
         out = self.act_linear(h) # (size of x , out_size)
         out = tf.reshape(out, (batch_size, -1, self.out_size))
