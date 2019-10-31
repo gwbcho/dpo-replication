@@ -1,10 +1,10 @@
-from policies.gac.gac_networks import Value, Critic, AutoRegressiveStochasticActor as Actor
-from policies.policy_helpers.helpers import ActionSampler, Transition
+from policies.gac.networks import Value, Critic, AutoRegressiveStochasticActor as Actor
+from policies.policy_helpers.helper_classes import ActionSampler, Transition
 import tensorflow as tf
 
 actor = Actor(3, 4, 5)
 critic = Critic(3+4, 2)
-value = Value(3, 1)
+value = Value(3)
 sampler = ActionSampler(4)
 
 transitions = Transition(

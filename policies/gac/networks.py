@@ -282,6 +282,15 @@ class StochasticActor(IQNSuperClass):
         return actions
 
 
+def _build_sequential_model(input_dim):
+    # A helper function for building the graph
+    model = Sequential()
+    model.add(Dense(units=400, input_shape=(input_dim,), activation=tf.nn.leaky_relu))
+    model.add(Dense(units=300, activation=tf.nn.leaky_relu))
+    model.add(Dense(units=1))
+    model.compile(optimizer='adam', loss='mse')
+    return model
+
 class Critic(tf.Module):
     '''
     The Critic class create one or two critic networks, which take states as input and return
@@ -296,20 +305,12 @@ class Critic(tf.Module):
         super(Critic, self).__init__()
         self.num_networks = num_networks
         self.state_dim = state_dim
-        self.q1 = self.build()
+        self.q1 = _build_sequential_model(state_dim)
         if self.num_networks == 2:
-            self.q2 = self.build()
+            self.q2 = _build_sequential_model(state_dim)
         elif self.num_networks > 2 or self.num_networks < 1:
             raise NotImplementedError
 
-    def build(self):
-        # A helper function for building the graph
-        model = Sequential()
-        model.add(Dense(units=400, input_shape=(self.state_dim,), activation=tf.nn.leaky_relu))
-        model.add(Dense(units=300, activation=tf.nn.leaky_relu))
-        model.add(Dense(units=1))
-        model.compile(optimizer='adam', loss='mse')
-        return model
 
     def train(self, transitions, value, gamma):
         """
@@ -334,22 +335,24 @@ class Critic(tf.Module):
             return history1
 
 
-    def __call__(self, x):
-        # This function returns the value of the forward path given input x
+    def __call__(self, states, actions):
+        x = tf.concat([states, actions], -1)
         if self.num_networks == 1:
             return self.q1.predict(x)
         else:
             return self.q1.predict(x), self.q2.predict(x)
 
 
-class Value(Critic):
+class Value():
 
     """
     Value network has the same architecture as Critic
     """
 
-    def __init__(self, state_dim, num_networks=1):
-        super(Value, self).__init__(state_dim, num_networks)
+    def __init__(self, state_dim):
+        self.model = _build_sequential_model(state_dim)
+        self.state_dim = state_dim
+
 
     def train(self, transitions, action_sampler, actor, critic, K):
         """
@@ -376,9 +379,7 @@ class Value(Critic):
         Line 14 of Algorithm 2.
         Get the Q value of the states and action samples.
         """
-        Q1, Q2 = critic(
-            tf.concat([states, actions], -1)
-        )
+        Q1, Q2 = critic(states, actions)
         Q1 = tf.reshape(Q1, [-1, K, 1])
         Q2 = tf.reshape(Q2, [-1, K, 1])
 
@@ -398,4 +399,7 @@ class Value(Critic):
         Get value of current state from the Value network.
         Loss is MSE.
         """
-        return self.q1.fit(transitions.s, v_true)
+        return self.model.fit(transitions.s, v_true)
+
+    def __call__(self, states):
+        return self.model.predict(states)
