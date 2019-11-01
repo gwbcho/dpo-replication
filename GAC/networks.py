@@ -66,6 +66,7 @@ class IQNActor(tf.Module):
         super(IQNActor, self).__init__()
         self.module_type = 'IQNActor'
         self.huber_loss_function = tf.keras.losses.Huber(delta=1.0)  # delta is kappa in paper
+        self.optimizer = tf.keras.optimizers.Adam(0.0001)
 
     def __call__(self, state, taus, actions=None):
         """
@@ -143,11 +144,16 @@ class IQNActor(tf.Module):
         '''
         
         taus = tf.random.uniform(tf.shape(supervise_actions))
-        actions = self(states, taus, supervise_actions)
-                    #(batch_size, action_dim)
         weights = self.target_policy_density(mode, advantage)
-        loss = self.huber_quantile_loss(actions, supervise_actions, taus, weights)
-        
+
+        with tf.GradientTape() as tape:
+            actions = self(states, taus, supervise_actions) #(batch_size, action_dim)
+            loss = self.huber_quantile_loss(actions, supervise_actions, taus, weights)
+        gradients = tape.gradient(loss, self.trainable_variables)
+        history = self.optimizer.apply_gradients(zip(gradients, self.trainable_variables))
+        return history
+
+
 
 class AutoRegressiveStochasticActor(IQNActor):
     def __init__(self, state_dim, action_dim, n_basis_functions):
