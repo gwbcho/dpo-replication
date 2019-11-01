@@ -371,11 +371,6 @@ class Critic(tf.Module):
         """
         x = tf.concat([transitions.s, transitions.a], -1)
         history1 = self.q1.fit(x, Q)
-        if self.num_networks == 2:
-            history2 = self.q2.fit(x, Q)
-            return history1, history2
-        else:
-            return history1
 
 
 class Value(tf.Module):
