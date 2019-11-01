@@ -128,7 +128,7 @@ class IQNActor(tf.Module):
             Loss for IQN super class
         """
         I_delta = tf.dtypes.cast(((actions - target_actions) > 0), tf.float32)
-        eltwise_huber_loss = tf.keras.losses.Huber(delta=1.0)(target_actions, actions)
+        eltwise_huber_loss = self.huber_loss_function(target_actions, actions)
         # delta is kappa in paper
         eltwise_loss = tf.math.abs(taus - I_delta) * eltwise_huber_loss * weights
 
