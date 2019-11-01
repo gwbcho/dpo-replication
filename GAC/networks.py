@@ -1,7 +1,3 @@
-from collections import deque
-import random
-
-
 import numpy as np
 import tensorflow as tf
 from tensorflow.keras import Sequential
