@@ -85,7 +85,7 @@ class IQNActor(tf.Module):
         """
         raise NotImplementedError
 
-    def target_policy_density(self, mode, advantage):
+    def target_density(self, mode, advantage):
         """
         The density of target policy D(a|s). Comes from table 1 in the paper.
 
@@ -144,7 +144,7 @@ class IQNActor(tf.Module):
         '''
         
         taus = tf.random.uniform(tf.shape(supervise_actions))
-        weights = self.target_policy_density(mode, advantage)
+        weights = self.target_density(mode, advantage)
 
         with tf.GradientTape() as tape:
             actions = self(states, taus, supervise_actions) #(batch_size, action_dim)
