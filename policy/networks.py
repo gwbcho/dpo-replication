@@ -27,7 +27,7 @@ class CosineBasisLinear(tf.Module):
         Class Args:
             n_basis_functions (int): the number of basis functions
             embed_dim (int): the dimensionality of embedding
-            activation (tf.function): activation function. 
+            activation (tf.function): activation function.
         """
         super(CosineBasisLinear, self).__init__()
         # coefficient of the basis
@@ -65,26 +65,44 @@ class CosineBasisLinear(tf.Module):
         return out
 
 
-class IQNSuperClass(tf.Module):
+class IQNActor(tf.Module):
     def __init__(self):
-        super(IQNSuperClass, self).__init__()
-        self.module_type = 'IQNSuperClass'
-        
+        super(IQNActor, self).__init__()
+        self.module_type = 'IQNActor'
+        self.huber_loss_function = tf.keras.losses.Huber(delta=1.0)  # delta is kappa in paper
+
+    def __call__(self, state, taus, actions=None):
+        """
+        Signature for all IQN related classes' __call__ functions. Note that actions is an optional
+        argument. This function is simply meant as a placeholder/stencil. It is not actually
+        necessary for this class.
+
+        Args:
+            state (tf.Variable): state vector containing a state with the format R^state_dim
+            taus (tf.Variable): randomly sampled noise vector for sampling purposes. This vector
+                should be of shape (batch_size x actor_dimension)
+            actions (tf.Variable): set of previous actions
+
+        Raise:
+            NotImplementedError (this is a template function)
+        """
+        raise NotImplementedError
 
     def target_policy_density(self, mode, actions, states, critic, value):
-        '''
-        The density of target policy D(a|s)
-        Comes from table 1 in the paper.
+        """
+        The density of target policy D(a|s). Comes from table 1 in the paper.
+
         Args:
             mode: ["linear", "boltzmann"]
             actions (tf.tensor): (batch_size, action_dim)
             states (tf.tensor): (batch_size, state_dim)
             critic (function):  (batch_size, state_dim) x (batch_size, action_dim) -> (batch_size, 1)
             value (function): (batch_size, state_dim) -> (batch_size, 1)
+
         Returns:
             density of D(a|s)
 
-        '''
+        """
         A = critic(states, actions) - value(actions)
         indicator = tf.dtypes.cast(A > 0, tf.float32)
         if mode == "linear":
@@ -114,6 +132,7 @@ class IQNSuperClass(tf.Module):
                 (batch_size, N, 1)-shaped array.
             weighting (tf.Variable): The density of target action distribution (D) as a
                 (batch_size, N, K)-shaped array.
+
         Returns:
             Loss for IQN super class
         """
@@ -125,7 +144,7 @@ class IQNSuperClass(tf.Module):
         return tf.math.reduce_mean(eltwise_loss)
 
 
-class AutoRegressiveStochasticActor(IQNSuperClass):
+class AutoRegressiveStochasticActor(IQNActor):
     def __init__(self, state_dim, action_dim, n_basis_functions):
         """
         the autoregressive stochastic actor is an implicit quantile network used to sample from a
@@ -166,7 +185,7 @@ class AutoRegressiveStochasticActor(IQNSuperClass):
         Args:
             state (tf.Variable): state vector containing a state with the format R^state_dim
             taus (tf.Variable): randomly sampled noise vector for sampling purposes. This vector
-                should be of shape (batch_size x actor_dimension x 1)
+                should be of shape (batch_size x actor_dimension)
             actions (tf.Variable): set of previous actions
 
         Returns:
@@ -251,7 +270,7 @@ class AutoRegressiveStochasticActor(IQNSuperClass):
         return tf.squeeze(actions, -1)
 
 
-class StochasticActor(IQNSuperClass):
+class StochasticActor(IQNActor):
     def __init__(self, state_dim, action_dim, n_basis_functions=64):
         """
         The IQN stochasitc action generator, takes state and tau (random vector) as input, and output
@@ -276,7 +295,7 @@ class StochasticActor(IQNSuperClass):
         self.noise_embedding_layer = CosineBasisLinear(
             n_basis_functions, self.noise_embed_dim,
             activation= tf.keras.layers.LeakyReLU(alpha=0.01))
-            
+
         self.merge_embedding_layer = Dense(
             200, activation= tf.keras.layers.LeakyReLU(alpha=0.01),
             input_shape = (self.noise_embed_dim * self.action_dim,))
@@ -307,15 +326,6 @@ class StochasticActor(IQNSuperClass):
         return actions
 
 
-def _build_sequential_model(input_dim):
-    # A helper function for building the graph
-    model = Sequential()
-    model.add(Dense(units=400, input_shape=(input_dim,), activation=tf.nn.leaky_relu))
-    model.add(Dense(units=300, activation=tf.nn.leaky_relu))
-    model.add(Dense(units=1))
-    model.compile(optimizer='adam', loss='mse')
-    return model
-
 class Critic(tf.Module):
     '''
     The Critic class create one or two critic networks, which take states as input and return
@@ -324,21 +334,31 @@ class Critic(tf.Module):
 
     Class Args:
     state_dim (int): number of states
+    num_networks (int): number of critc networks need to be created
     '''
     def __init__(self, state_dim, action_dim):
-
         super(Critic, self).__init__()
         self.state_dim = state_dim
         self.action_dim = action_dim
-        self.model = _build_sequential_model(state_dim+action_dim)
+        self.model = self._build_sequential_model(state_dim+action_dim)
 
     def __call__(self, states, actions):
         x = tf.concat([states, actions], -1)
         return self.model.predict(x)
 
+    def _build_sequential_model(self, input_dim):
+        # A helper function for building the graph
+        model = Sequential()
+        model.add(Dense(units=400, input_shape=(input_dim,), activation=tf.nn.leaky_relu))
+        model.add(Dense(units=300, activation=tf.nn.leaky_relu))
+        model.add(Dense(units=1))
+        model.compile(optimizer='adam', loss='mse')
+        return model
+
     def train(self, transitions, value, gamma):
         """
-        transitions is of type named tuple policies.policy_helpers.helpers.Transition
+        transitions is of type named tuple policy.policy_helpers.helpers.Transition
+        q1, q2 are seperate Q networks, thus can be trained separately
         """
 
         """
@@ -354,9 +374,6 @@ class Critic(tf.Module):
         return history
 
 
-
-
-
 class Value(tf.Module):
 
     """
@@ -365,21 +382,33 @@ class Value(tf.Module):
 
     def __init__(self, state_dim):
         super(Value, self).__init__()
-        self.model = _build_sequential_model(state_dim)
+        self.model = self._build_sequential_model(state_dim)
         self.state_dim = state_dim
 
     def __call__(self, states):
         return self.model.predict(states)
 
+    def _build_sequential_model(self, input_dim):
+        # A helper function for building the graph
+        # model functions should be constructed separately to preserve modular design
+        model = Sequential()
+        model.add(Dense(units=400, input_shape=(input_dim,), activation=tf.nn.leaky_relu))
+        model.add(Dense(units=300, activation=tf.nn.leaky_relu))
+        model.add(Dense(units=1))
+        model.compile(optimizer='adam', loss='mse')
+        return model
+
     def train(self, transitions, actor, critic1, critic2, action_samples = 64):
         """
-        transitions is of type named tuple policies.policy_helpers.helpers.Transition
-        action_sampler is of type policies.policy_helpers.helpers.ActionSampler
+        transitions is of type named tuple policy.policy_helpers.helpers.Transition
+        action_sampler is of type policy.policy_helpers.helpers.ActionSampler
         """
 
         """Each state needs action_samples action samples"""
 
         #TODO: this tiling part is pretty dangerous. NEED DOUBLE CHECK!
+        # note from Greg: I think I've implemented a version of their tiling function
+        # please review it (_tile) to see if this is a more faithful version
 
         # originally, transitions.s is [batch_size , state_dim]
         states = tf.expand_dims(transitions.s, 1) # [batch_size , 1 , state_dim]
@@ -418,41 +447,4 @@ class Value(tf.Module):
         Get value of current state from the Value network.
         Loss is MSE.
         """
-
         return self.model.fit(transitions.s, v_critic)
-
-
-
-
-class ReplayBuffer:
-    """
-    A simple FIFO experience replay buffer.
-    Copied from 
-    https://github.com/openai/spinningup/blob/master/spinup/algos/sac/sac.py (with The MIT License)
-    """
-
-    def __init__(self, obs_dim, act_dim, size):
-        self.obs1_buf = np.zeros([size, obs_dim], dtype=np.float32)
-        self.obs2_buf = np.zeros([size, obs_dim], dtype=np.float32)
-        self.acts_buf = np.zeros([size, act_dim], dtype=np.float32)
-        self.rews_buf = np.zeros(size, dtype=np.float32)
-        self.done_buf = np.zeros(size, dtype=np.float32)
-        self.ptr, self.size, self.max_size = 0, 0, size
-
-    def store(self, obs, act, rew, next_obs, done):
-        self.obs1_buf[self.ptr] = obs
-        self.obs2_buf[self.ptr] = next_obs
-        self.acts_buf[self.ptr] = act
-        self.rews_buf[self.ptr] = rew
-        self.done_buf[self.ptr] = done
-        self.ptr = (self.ptr+1) % self.max_size
-        self.size = min(self.size+1, self.max_size)
-
-    def sample_batch(self, batch_size=32):
-        idxs = np.random.randint(0, self.size, size=batch_size)
-        return dict(obs1=self.obs1_buf[idxs],
-                    obs2=self.obs2_buf[idxs],
-                    acts=self.acts_buf[idxs],
-                    rews=self.rews_buf[idxs],
-                    done=self.done_buf[idxs])
-

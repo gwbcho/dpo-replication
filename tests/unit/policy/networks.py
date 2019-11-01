@@ -2,7 +2,7 @@ import unittest
 
 import tensorflow as tf
 
-import policies.gac.gac_networks as gac_networks
+import policy.networks as networks
 
 
 class TestGacNetworks(unittest.TestCase):
@@ -10,7 +10,7 @@ class TestGacNetworks(unittest.TestCase):
     def test_cosine_basis_linear(self):
         n_basis_functions = 64
         out_size = 400
-        embedding = gac_networks.CosineBasisLinear(n_basis_functions, out_size)
+        embedding = networks.CosineBasisLinear(n_basis_functions, out_size)
         batch_size_1 = 10
         batch_size_2 = 10
         # random input
@@ -33,7 +33,7 @@ class TestGacNetworks(unittest.TestCase):
         action_dim = 5
         n_basis_functions = 64
         # construct the autoregressive stochasitc actor for testing
-        actor = gac_networks.AutoRegressiveStochasticActor(
+        actor = networks.AutoRegressiveStochasticActor(
             num_inputs,
             action_dim,
             n_basis_functions
@@ -61,7 +61,7 @@ class TestGacNetworks(unittest.TestCase):
         action_dim = 5
         n_basis_functions = 64
         # construct the autoregressive stochasitc actor for testing
-        actor = gac_networks.AutoRegressiveStochasticActor(
+        actor = networks.AutoRegressiveStochasticActor(
             num_inputs,
             action_dim,
             n_basis_functions
@@ -94,7 +94,7 @@ class TestGacNetworks(unittest.TestCase):
         action_dim = 5
         n_basis_functions = 64
         # construct the autoregressive stochasitc actor for testing
-        actor = gac_networks.StochasticActor(
+        actor = networks.StochasticActor(
             num_inputs,
             action_dim,
             n_basis_functions
@@ -124,16 +124,24 @@ class TestGacNetworks(unittest.TestCase):
     def test_critic_network(self):
         batch_size_1 = 10
         num_inputs = 20
-        critic = gac_networks.Critic(num_inputs)
+        action_dim = 5
+        critic = networks.Critic(num_inputs, action_dim)
         # random variable to feed into critic
-        x = tf.Variable(
+        state = tf.Variable(
             tf.random.normal(
                 [batch_size_1, num_inputs],
                 stddev=.1,
                 dtype=tf.float32
             )
         )
-        out = critic(x)
+        x = tf.Variable(
+            tf.random.normal(
+                [batch_size_1, action_dim],
+                stddev=.1,
+                dtype=tf.float32
+            )
+        )
+        out = critic(state, x)
         self.assertEqual(out.shape[0], batch_size_1)
         self.assertEqual(out.shape[1], 1)
 

@@ -1,11 +1,12 @@
-from policies.gac.networks import Value, Critic, AutoRegressiveStochasticActor as Actor
-from policies.policy_helpers.helper_classes import ActionSampler, Transition
 import tensorflow as tf
 
+from policy.gac.networks import Value, Critic, AutoRegressiveStochasticActor as Actor
+from policy.policy_helpers.helper_classes import ActionSampler, Transition
+
+
 actor = Actor(3, 4, 5)
-critic1 = Critic(3, 4)
-critic2 = Critic(3, 4)
-value = Value(3)
+critic = Critic(3+4, 2)
+value = Value(3, 1)
 sampler = ActionSampler(4)
 
 transitions = Transition(
@@ -42,5 +43,5 @@ transitions = Transition(
         ),
     )
 
-train_history = value.train(transitions, sampler, actor, critic1, critic2, 2)
+train_history = value.train(transitions, sampler, actor, critic, 2)
 print(train_history.history)

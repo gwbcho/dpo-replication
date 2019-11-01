@@ -1,11 +1,14 @@
+# import external dependencies
 import numpy as np
 import tensorflow as tf
 
+# internal dependencies
 import utils.utils as utils
 
-import policies.gac.networks as networks
-import policies.policy_helpers.helpers as policy_helpers
-import policies.policy_helpers.helper_classes as policy_helper_classes
+# import local dependencies
+import policy.networks as networks
+import policy.policy_helpers.helper_functions as policy_helper_functions
+import policy.policy_helpers.helper_classes as policy_helper_classes
 
 
 """
@@ -23,7 +26,41 @@ class GACAgent:
     distribution over continuous action space.
     """
 
-    def __init__(self):
+    def __init__(self, gamma, soft_update_rate, state_dim, action_space, replay_size,
+                 normalize_obs=False, normalize_returns=False, num_basis_functions=64,
+                 num_outputs=1, use_value=True, q_normalization=0.01, target_policy='linear',
+                 target_policy_q='min', autoregressive=True, temp=1.0):
+
+        # TODO: Construct function as specified in the paper
+        self.state_dim = state_dim
+        self.action_space = action_space
+        self.num_outputs = num_outputs
+        self.num_basis_functions = num_basis_functions
+        self.action_dim = self.action_space.shape[0]
+        self.use_value = use_value
+        self.q_normalization = q_normalization
+        self.target_policy = target_policy
+        self.autoregressive = autoregressive
+        self.temp = temp
+
+        # initial Policy class initialized values
+        self.gamma = gamma
+        self.soft_update_rate = soft_update_rate
+        self.normalize_observations = normalize_obs
+        self.normalize_returns = normalize_returns
+
+        if self.normalize_observations:
+            self.obs_rms = utils.RunningMeanStd(shape=state_dim)
+        else:
+            self.obs_rms = None
+
+        if self.normalize_returns:
+            self.ret_rms = utils.RunningMeanStd(shape=1)
+            self.ret = 0
+            self.cliprew = 10.0
+        else:
+            self.ret_rms = None
+
         self.memory = policy_helper_classes.ReplayMemory(replay_size)
         self.actor = None
         self.actor_perturbed = None
@@ -81,7 +118,7 @@ class GACAgent:
         self.value_optimizer = tf.keras.optimizers.Adam(learning_rate=1e-3)
 
     def select_action(self, state, action_noise=None, param_noise=None):
-        state = policy_helpers.normalize(
+        state = policy_helper_functions.normalize(
             tf.Variable(state),
             self.obs_rms
         )
@@ -114,7 +151,7 @@ class GACAgent:
         transitions = self.memory.sample(batch_size)
         batch = policy_helper_classes.Transition(*zip(*transitions))
 
-        state_batch = policy_helpers.normalize(
+        state_batch = policy_helper_functions.normalize(
             tf.Variable(
                 tf.stack(batch.state)
             ),
@@ -122,7 +159,7 @@ class GACAgent:
         )
 
         action_batch = tf.Variable(tf.stack(batch.action))
-        reward_batch = policy_helpers.normalize(
+        reward_batch = policy_helper_functions.normalize(
             tf.Variable(
                 tf.expand_dims(
                     tf.stack(batch.reward),
@@ -137,7 +174,7 @@ class GACAgent:
                 1
             )
         )
-        next_state_batch = policy_helpers.normalize(
+        next_state_batch = policy_helper_functions.normalize(
             tf.Variable(
                 tf.stack(batch.next_state)
             ),
@@ -164,7 +201,7 @@ class GACAgent:
         """
         Apply parameter noise to actor model, for exploration
         """
-        policy_helpers.hard_update(self.actor_perturbed, self.actor)
+        policy_helper_functions.hard_update(self.actor_perturbed, self.actor)
         params = self.actor_perturbed.state_dict()
         for name in params:
             if 'ln' in name:
@@ -187,11 +224,10 @@ class GACAgent:
         return tf.gather_nd(tiled_results, order_index, dim)
 
     # TODO: implement the following functions
-    def policy(self, actor, state):
-        raise NotImplementedError
-
     def update_critic(self, state_batch, action_batch, reward_batch, mask_batch, next_state_batch):
         raise NotImplementedError
+
+    def update_actor(self, state_batch):
 
     def soft_update(self):
         raise NotImplementedError
