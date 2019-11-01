@@ -136,8 +136,7 @@ class IQNActor(tf.Module):
 
     def train(self, states, supervise_actions, advantage, mode):
         '''
-        supervise_actions is the a_hat in the paper Algorithm 2.
-        transitions: the turple of transitions
+        the batch_size here combines the state_batch_size and action samples.
         states: (batch_size,  state_dim)
         supervise_actions: (batch_size, action_dim)
         advantage: (batch_size, 1)
