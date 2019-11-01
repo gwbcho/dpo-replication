@@ -7,7 +7,7 @@ import utils.utils as utils
 
 # import local dependencies
 import GAC.networks as networks
-import GAC.helper as helper
+import GAC.helpers as helpers
 
 
 """
@@ -60,10 +60,10 @@ class GACAgent:
         else:
             self.ret_rms = None
 
-        self.memory = helper.ReplayMemory(replay_size)
+        self.memory = helpers.ReplayMemory(replay_size)
         self.actor = None
         self.actor_perturbed = None
-        self.policy = helper.ActionSampler(self.action_dim)
+        self.policy = helpers.ActionSampler(self.action_dim)
 
         if target_policy_q == 'min':
             self.target_policy_q = lambda x, y: tf.math.minimum(x, y)
@@ -117,7 +117,7 @@ class GACAgent:
         self.value_optimizer = tf.keras.optimizers.Adam(learning_rate=1e-3)
 
     def select_action(self, state, action_noise=None, param_noise=None):
-        state = helper.normalize(
+        state = helpers.normalize(
             tf.Variable(state),
             self.obs_rms
         )
@@ -148,9 +148,9 @@ class GACAgent:
 
     def update_parameters(self, batch_size):
         transitions = self.memory.sample(batch_size)
-        batch = helper.Transition(*zip(*transitions))
+        batch = helpers.Transition(*zip(*transitions))
 
-        state_batch = helper.normalize(
+        state_batch = helpers.normalize(
             tf.Variable(
                 tf.stack(batch.state)
             ),
@@ -158,7 +158,7 @@ class GACAgent:
         )
 
         action_batch = tf.Variable(tf.stack(batch.action))
-        reward_batch = helper.normalize(
+        reward_batch = helpers.normalize(
             tf.Variable(
                 tf.expand_dims(
                     tf.stack(batch.reward),
@@ -173,7 +173,7 @@ class GACAgent:
                 1
             )
         )
-        next_state_batch = helper.normalize(
+        next_state_batch = helpers.normalize(
             tf.Variable(
                 tf.stack(batch.next_state)
             ),
@@ -200,7 +200,7 @@ class GACAgent:
         """
         Apply parameter noise to actor model, for exploration
         """
-        helper.hard_update(self.actor_perturbed, self.actor)
+        helpers.hard_update(self.actor_perturbed, self.actor)
         params = self.actor_perturbed.state_dict()
         for name in params:
             if 'ln' in name:
