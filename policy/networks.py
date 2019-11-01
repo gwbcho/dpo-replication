@@ -370,7 +370,8 @@ class Critic(tf.Module):
         Line 11-12 of Algorithm 2
         """
         x = tf.concat([transitions.s, transitions.a], -1)
-        history1 = self.q1.fit(x, Q)
+        history = self.model.fit(x, Q)
+        return history
 
 
 class Value(tf.Module):
