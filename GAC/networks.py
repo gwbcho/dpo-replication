@@ -84,28 +84,22 @@ class IQNActor(tf.Module):
         """
         raise NotImplementedError
 
-    def target_policy_density(self, mode, actions, states, critic, value):
+    def target_policy_density(self, mode, advantage):
         """
         The density of target policy D(a|s). Comes from table 1 in the paper.
 
         Args:
             mode: ["linear", "boltzmann"]
-            actions (tf.tensor): (batch_size, action_dim)
-            states (tf.tensor): (batch_size, state_dim)
-            critic (function):  (batch_size, state_dim) x (batch_size, action_dim) -> (batch_size, 1)
-            value (function): (batch_size, state_dim) -> (batch_size, 1)
-
+            advantange: (batch_size, 1)
         Returns:
             density of D(a|s)
 
         """
-        A = critic(states, actions) - value(actions)
-        indicator = tf.dtypes.cast(A > 0, tf.float32)
         if mode == "linear":
-            return indicator * A / tf.reduce_sum(A)
+            return advantage / tf.reduce_sum(advantage)
         elif mode == "boltzmann":
             beta = 1.0
-            return indicator * tf.nn.softmax(A/beta)
+            return tf.nn.softmax(advantage/beta)
         else:
             raise NotImplementedError
 
@@ -139,24 +133,20 @@ class IQNActor(tf.Module):
 
         return tf.math.reduce_mean(eltwise_loss)
 
-    def train(self, transitions, supervise_actions, mode, critic, value):
+    def train(self, states, supervise_actions, advantage, mode):
         '''
         supervise_actions is the a_hat in the paper Algorithm 2.
         transitions: the turple of transitions
-        supervise_actions: (state_batch_size, action_samples, action_dim)
+        states: (batch_size,  state_dim)
+        supervise_actions: (batch_size, action_dim)
+        advantage: (batch_size, 1)
         '''
-        state_batch_size, action_samples, action_dim = tf.shape(supervise_actions)
-        states = tf.expand_dims(transitions.s, axis = 1) # (state_batch_size, 1, state_dim)
-        tiled_states = tf.tile(states,[1,action_samples,1]) #(state_batch_size, action_samples, state_dim)
-        reshaped_states = tf.reshape(tiled_states, shape = (state_batch_size * action_samples, -1)) 
-                                #(state_batch_size * action_samples, state_dim)
-        reshaped_supervise_actions = tf.reshape(supervise_actions, shape = (state_batch_size * action_samples, -1))
-                                #(state_batch_size * action_samples, action_dim)
-        taus = tf.random.uniform(shape=((state_batch_size * action_samples, action_dim)))
-        actions = self(reshaped_states, taus, reshaped_supervise_actions)
-                                #(state_batch_size * action_samples, action_dim)
-        weights = self.target_policy_density(mode, actions, reshaped_states, critic, value)
-        loss = self.huber_quantile_loss(actions, reshaped_supervise_actions, taus, weights)
+        
+        taus = tf.random.uniform(tf.shape(supervise_actions))
+        actions = self(states, taus, supervise_actions)
+                    #(batch_size, action_dim)
+        weights = self.target_policy_density(mode, advantage)
+        loss = self.huber_quantile_loss(actions, supervise_actions, taus, weights)
         
 
 class AutoRegressiveStochasticActor(IQNActor):
@@ -250,7 +240,7 @@ class AutoRegressiveStochasticActor(IQNActor):
         Args:
             state (tf.Variable(array)): state vector representation
             taus (tf.Variable(array)): noise vector
-            actions (tf.Variable(array)): actions vector (batch x action dim)
+            supervise_actions (tf.Variable(array)): actions vector (batch x action dim)
 
         Returns:
             a action vector of size (batch x action dim)
