@@ -39,7 +39,7 @@ class ReplayBuffer:
     '''
 
     def __init__(self, obs_dim, act_dim, size):
-        self.transition = namedtuple('transition', ['s', 'a', 'r', 'sp', 'it'])
+        self.transitions = namedtuple('transition', ['s', 'a', 'r', 'sp', 'it'])
         # (this_state, this_action, this_reward, next_state, this_is_terminal)
 
         self.obs1_buf = np.zeros([size, obs_dim], dtype=np.float32)
@@ -60,12 +60,12 @@ class ReplayBuffer:
 
     def sample_batch(self, batch_size=32):
         idxs = np.random.randint(0, self.size, size=batch_size)
-        self.transition.s = self.obs1_buf[idxs]
-        self.transition.a = self.acts_buf[idxs]
-        self.transition.r = self.rews_buf[idxs]
-        self.transition.sp = self.obs2_buf[idxs]
-        self.transition.it = self.done_buf[idxs]
-        return self.transition
+        self.transitions.s = self.obs1_buf[idxs]
+        self.transitions.a = self.acts_buf[idxs]
+        self.transitions.r = self.rews_buf[idxs]
+        self.transitions.sp = self.obs2_buf[idxs]
+        self.transitions.it = self.done_buf[idxs]
+        return self.transitions
 
 
 
