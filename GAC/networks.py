@@ -62,8 +62,12 @@ class CosineBasisLinear(tf.Module):
 
 
 class IQNActor(tf.Module):
-    def __init__(self):
+    def __init__(self, state_dim, action_dim):
         super(IQNActor, self).__init__()
+        self.state_dim = state_dim
+        self.action_dim = action_dim 
+        # we will use in the loss function.
+
         self.module_type = 'IQNActor'
         self.huber_loss_function = tf.keras.losses.Huber(delta=1.0)  # delta is kappa in paper
         self.optimizer = tf.keras.optimizers.Adam(0.0001)
@@ -126,7 +130,8 @@ class IQNActor(tf.Module):
         eltwise_loss = tf.math.abs(taus - I_delta) * eltwise_huber_loss * weights 
         #(batch_size, action_dim)
 
-        return tf.math.reduce_mean(eltwise_loss) # mean over batches and action dimensions
+        return tf.math.reduce_mean(eltwise_loss) * self.action_dim
+             # mean over batches, sum over action dimensions, according to Algorithm 2.
 
     def train(self, states, supervise_actions, advantage, mode):
         '''
@@ -142,7 +147,6 @@ class IQNActor(tf.Module):
         with tf.GradientTape() as tape:
             actions = self(states, taus, supervise_actions) #(batch_size, action_dim)
             loss = self.huber_quantile_loss(actions, supervise_actions, taus, weights)
-
         gradients = tape.gradient(loss, self.trainable_variables)
         history = self.optimizer.apply_gradients(zip(gradients, self.trainable_variables))
         return history
@@ -161,10 +165,9 @@ class AutoRegressiveStochasticActor(IQNActor):
             action_dim (int): the dimensionality of the action vector
             n_basis_functions (int): the number of basis functions
         """
-        super(AutoRegressiveStochasticActor, self).__init__()
+        super(AutoRegressiveStochasticActor, self).__init__(state_dim, action_dim)
         # create all necessary class variables
         self.module_type = 'AutoRegressiveStochasticActor'
-        self.action_dim = action_dim
         self.state_embedding = Dense(
             400,  # as specified by the architecture in the paper and in their code
             activation=tf.nn.leaky_relu
@@ -287,15 +290,15 @@ class StochasticActor(IQNActor):
             action_dim (int): the dimensionality of the action vector
             n_basis_functions (int): the number of basis functions for noise embedding.
         """
-        super(StochasticActor, self).__init__()
+        super(StochasticActor, self).__init__(state_dim, action_dim)
         self.module_type = 'StochasticActor'
         self.noise_embed_dim = 400 // action_dim
-        self.action_dim = action_dim
+
 
         self.state_embedding_layer = Dense(
             self.noise_embed_dim * self.action_dim,
             activation=tf.keras.layers.LeakyReLU(alpha=0.01),
-            input_shape = (state_dim,))
+            input_shape = (self.state_dim,))
 
         self.noise_embedding_layer = CosineBasisLinear(
             n_basis_functions, self.noise_embed_dim,
