@@ -124,16 +124,24 @@ class TestGacNetworks(unittest.TestCase):
     def test_critic_network(self):
         batch_size_1 = 10
         num_inputs = 20
-        critic = networks.Critic(num_inputs)
+        action_dim = 5
+        critic = networks.Critic(num_inputs, action_dim)
         # random variable to feed into critic
-        x = tf.Variable(
+        state = tf.Variable(
             tf.random.normal(
                 [batch_size_1, num_inputs],
                 stddev=.1,
                 dtype=tf.float32
             )
         )
-        out = critic(x)
+        x = tf.Variable(
+            tf.random.normal(
+                [batch_size_1, action_dim],
+                stddev=.1,
+                dtype=tf.float32
+            )
+        )
+        out = critic(state, x)
         self.assertEqual(out.shape[0], batch_size_1)
         self.assertEqual(out.shape[1], 1)
 
