@@ -66,6 +66,7 @@ class IQNActor(tf.Module):
         super(IQNActor, self).__init__()
         self.module_type = 'IQNActor'
         self.huber_loss_function = tf.keras.losses.Huber(delta=1.0)  # delta is kappa in paper
+        self.optimizer = tf.keras.optimizers.Adam(0.0001)
 
     def __call__(self, state, taus, actions=None):
         """
@@ -84,28 +85,22 @@ class IQNActor(tf.Module):
         """
         raise NotImplementedError
 
-    def target_policy_density(self, mode, actions, states, critic, value):
+    def target_density(self, mode, advantage):
         """
         The density of target policy D(a|s). Comes from table 1 in the paper.
 
         Args:
             mode: ["linear", "boltzmann"]
-            actions (tf.tensor): (batch_size, action_dim)
-            states (tf.tensor): (batch_size, state_dim)
-            critic (function):  (batch_size, state_dim) x (batch_size, action_dim) -> (batch_size, 1)
-            value (function): (batch_size, state_dim) -> (batch_size, 1)
-
+            advantange: (batch_size, 1)
         Returns:
             density of D(a|s)
 
         """
-        A = critic(states, actions) - value(actions)
-        indicator = tf.dtypes.cast(A > 0, tf.float32)
         if mode == "linear":
-            return indicator * A / tf.reduce_sum(A)
+            return advantage / tf.reduce_sum(advantage)
         elif mode == "boltzmann":
             beta = 1.0
-            return indicator * tf.nn.softmax(A/beta)
+            return tf.nn.softmax(advantage/beta)
         else:
             raise NotImplementedError
 
@@ -133,31 +128,32 @@ class IQNActor(tf.Module):
             Loss for IQN super class
         """
         I_delta = tf.dtypes.cast(((actions - target_actions) > 0), tf.float32)
-        eltwise_huber_loss = tf.keras.losses.Huber(delta=1.0)(target_actions, actions)
+        eltwise_huber_loss = self.huber_loss_function(target_actions, actions)
         # delta is kappa in paper
         eltwise_loss = tf.math.abs(taus - I_delta) * eltwise_huber_loss * weights
 
         return tf.math.reduce_mean(eltwise_loss)
 
-    def train(self, transitions, supervise_actions, mode, critic, value):
+    def train(self, states, supervise_actions, advantage, mode):
         '''
         supervise_actions is the a_hat in the paper Algorithm 2.
         transitions: the turple of transitions
-        supervise_actions: (state_batch_size, action_samples, action_dim)
+        states: (batch_size,  state_dim)
+        supervise_actions: (batch_size, action_dim)
+        advantage: (batch_size, 1)
         '''
-        state_batch_size, action_samples, action_dim = tf.shape(supervise_actions)
-        states = tf.expand_dims(transitions.s, axis = 1) # (state_batch_size, 1, state_dim)
-        tiled_states = tf.tile(states,[1,action_samples,1]) #(state_batch_size, action_samples, state_dim)
-        reshaped_states = tf.reshape(tiled_states, shape = (state_batch_size * action_samples, -1)) 
-                                #(state_batch_size * action_samples, state_dim)
-        reshaped_supervise_actions = tf.reshape(supervise_actions, shape = (state_batch_size * action_samples, -1))
-                                #(state_batch_size * action_samples, action_dim)
-        taus = tf.random.uniform(shape=((state_batch_size * action_samples, action_dim)))
-        actions = self(reshaped_states, taus, reshaped_supervise_actions)
-                                #(state_batch_size * action_samples, action_dim)
-        weights = self.target_policy_density(mode, actions, reshaped_states, critic, value)
-        loss = self.huber_quantile_loss(actions, reshaped_supervise_actions, taus, weights)
         
+        taus = tf.random.uniform(tf.shape(supervise_actions))
+        weights = self.target_density(mode, advantage)
+
+        with tf.GradientTape() as tape:
+            actions = self(states, taus, supervise_actions) #(batch_size, action_dim)
+            loss = self.huber_quantile_loss(actions, supervise_actions, taus, weights)
+        gradients = tape.gradient(loss, self.trainable_variables)
+        history = self.optimizer.apply_gradients(zip(gradients, self.trainable_variables))
+        return history
+
+
 
 class AutoRegressiveStochasticActor(IQNActor):
     def __init__(self, state_dim, action_dim, n_basis_functions):
@@ -250,7 +246,7 @@ class AutoRegressiveStochasticActor(IQNActor):
         Args:
             state (tf.Variable(array)): state vector representation
             taus (tf.Variable(array)): noise vector
-            actions (tf.Variable(array)): actions vector (batch x action dim)
+            supervise_actions (tf.Variable(array)): actions vector (batch x action dim)
 
         Returns:
             a action vector of size (batch x action dim)
