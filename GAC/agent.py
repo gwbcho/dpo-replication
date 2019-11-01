@@ -6,9 +6,8 @@ import tensorflow as tf
 import utils.utils as utils
 
 # import local dependencies
-import policy.networks as networks
-import policy.policy_helpers.helper_functions as policy_helper_functions
-import policy.policy_helpers.helper_classes as policy_helper_classes
+import GAC.networks as networks
+import GAC.helper as helper
 
 
 """
@@ -61,10 +60,10 @@ class GACAgent:
         else:
             self.ret_rms = None
 
-        self.memory = policy_helper_classes.ReplayMemory(replay_size)
+        self.memory = helper.ReplayMemory(replay_size)
         self.actor = None
         self.actor_perturbed = None
-        self.policy = policy_helper_classes.ActionSampler(self.action_dim)
+        self.policy = helper.ActionSampler(self.action_dim)
 
         if target_policy_q == 'min':
             self.target_policy_q = lambda x, y: tf.math.minimum(x, y)
@@ -118,7 +117,7 @@ class GACAgent:
         self.value_optimizer = tf.keras.optimizers.Adam(learning_rate=1e-3)
 
     def select_action(self, state, action_noise=None, param_noise=None):
-        state = policy_helper_functions.normalize(
+        state = helper.normalize(
             tf.Variable(state),
             self.obs_rms
         )
@@ -149,9 +148,9 @@ class GACAgent:
 
     def update_parameters(self, batch_size):
         transitions = self.memory.sample(batch_size)
-        batch = policy_helper_classes.Transition(*zip(*transitions))
+        batch = helper.Transition(*zip(*transitions))
 
-        state_batch = policy_helper_functions.normalize(
+        state_batch = helper.normalize(
             tf.Variable(
                 tf.stack(batch.state)
             ),
@@ -159,7 +158,7 @@ class GACAgent:
         )
 
         action_batch = tf.Variable(tf.stack(batch.action))
-        reward_batch = policy_helper_functions.normalize(
+        reward_batch = helper.normalize(
             tf.Variable(
                 tf.expand_dims(
                     tf.stack(batch.reward),
@@ -174,7 +173,7 @@ class GACAgent:
                 1
             )
         )
-        next_state_batch = policy_helper_functions.normalize(
+        next_state_batch = helper.normalize(
             tf.Variable(
                 tf.stack(batch.next_state)
             ),
@@ -201,7 +200,7 @@ class GACAgent:
         """
         Apply parameter noise to actor model, for exploration
         """
-        policy_helper_functions.hard_update(self.actor_perturbed, self.actor)
+        helper.hard_update(self.actor_perturbed, self.actor)
         params = self.actor_perturbed.state_dict()
         for name in params:
             if 'ln' in name:
@@ -228,6 +227,7 @@ class GACAgent:
         raise NotImplementedError
 
     def update_actor(self, state_batch):
+        raise NotImplementedError
 
     def soft_update(self):
         raise NotImplementedError
