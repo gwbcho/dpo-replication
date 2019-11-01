@@ -255,9 +255,10 @@ class StochasticActor(IQNSuperClass):
             n_basis_functions (int): the number of basis functions for noise embedding.
         """
         super(StochasticActor, self).__init__()
-        self.l1 = tf.keras.layers.Dense(420)
-        cosine_hidden_size = 420//action_dim
-        assert cosine_hidden_size * action_dim == 420
+        self.action_dim = action_dim
+        cosine_hidden_size = 400//action_dim
+        units = cosine_hidden_size * action_dim 
+        self.l1 = tf.keras.layers.Dense(units)
         self.phi = CosineBasisLinear(n_basis_functions, cosine_hidden_size)
         self.l2 = tf.keras.layers.Dense(200)
         self.l3 = tf.keras.layers.Dense(action_dim)
@@ -270,15 +271,12 @@ class StochasticActor(IQNSuperClass):
         Return:
             next_actions: tensor (batch_size, action_dim)
         """
-        state_embedding = tf.keras.layers.LeakyReLU(self.l1(states)) # (batch_size, self.hidden_size * self.action_dim)
-        noise_embedding = tf.keras.layers.LeakyReLU(self.phi(taus)) # (batch_size, self.action_dim, self.hidden_size)
-        # again, phi (CosineBasisLinear) is an entry-wise embedding.
-        noise_embedding = tf.reshape(noise_embedding, (-1, 420))
-                        # (batch_size, self.hidden_size * self.action_dim)
+        state_embedding = tf.nn.leaky_relu(self.l1(states))
+        noise_embedding = tf.nn.leaky_relu(self.phi(taus))
+        noise_embedding = tf.reshape(noise_embedding, (-1, units))
         hadamard_product = state_embedding * noise_embedding
-                        # (batch_size, self.hidden_size * self.action_dim)
-        l2 = tf.keras.layers.LeakyReLU(self.l2(hadamard_product))  #(batch_size, 200)
-        actions = tf.tanh(self.l3(l2)) # (batch_size, self.action_dim)
+        l2 = tf.nn.leaky_relu(self.l2(hadamard_product))
+        actions = tf.tanh(self.l3(l2))
         return actions
 
 
@@ -372,8 +370,8 @@ class Value():
         Line 14 of Algorithm 2.
         Sum over all action samples for Q1, Q2 and take the minimum.
         """
-        v1 = tf.reduce_sum(Q1, 1, keepdims=True)
-        v2 = tf.reduce_sum(Q2, 1, keepdims=True)
+        v1 = tf.reduce_mean(Q1, 1, keepdims=True)
+        v2 = tf.reduce_mean(Q2, 1, keepdims=True)
         v_true = tf.reduce_min(
             tf.concat([v1, v2], 1),
             1,

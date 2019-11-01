@@ -8,6 +8,7 @@ import tensorflow as tf
 from policies.gac.networks import AutoRegressiveStochasticActor as AIQN
 from policies.gac.networks import StochasticActor as IQN
 from policies.gac.networks import Critic, Value
+from policies.gac.gac import GenerativeActorCritic as GAC
 
 
 def create_argument_parser():
@@ -108,6 +109,7 @@ def main():
     target_critic1 = Critic(state_dim, action_dim)
     target_critic2 = Critic(state_dim, action_dim)
     target_value = Value(state_dim)
+    
 
 
     train(args)
