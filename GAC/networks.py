@@ -1,7 +1,3 @@
-from collections import deque
-import random
-
-
 import numpy as np
 import tensorflow as tf
 from tensorflow.keras import Sequential
@@ -113,7 +109,7 @@ class IQNActor(tf.Module):
         else:
             raise NotImplementedError
 
-    def huber_quantile_loss(self, actions, target_actions, taus, weighting):
+    def huber_quantile_loss(self, actions, target_actions, taus, weights):
         """
         Compute elementwise Huber losses for quantile regression.
         This is based on Algorithm 1 of https://arxiv.org/abs/1806.06923.
@@ -130,7 +126,7 @@ class IQNActor(tf.Module):
                 (batch_size, N, K)-shaped array.
             taus (tf.Variable): Quantile thresholds used to compute y as a
                 (batch_size, N, 1)-shaped array.
-            weighting (tf.Variable): The density of target action distribution (D) as a
+            weights (tf.Variable): The density of target action distribution (D) as a
                 (batch_size, N, K)-shaped array.
 
         Returns:
@@ -139,10 +135,29 @@ class IQNActor(tf.Module):
         I_delta = tf.dtypes.cast(((actions - target_actions) > 0), tf.float32)
         eltwise_huber_loss = tf.keras.losses.Huber(delta=1.0)(target_actions, actions)
         # delta is kappa in paper
-        eltwise_loss = tf.math.abs(taus - I_delta) * eltwise_huber_loss * weighting
+        eltwise_loss = tf.math.abs(taus - I_delta) * eltwise_huber_loss * weights
 
         return tf.math.reduce_mean(eltwise_loss)
 
+    def train(self, transitions, supervise_actions, mode, critic, value):
+        '''
+        supervise_actions is the a_hat in the paper Algorithm 2.
+        transitions: the turple of transitions
+        supervise_actions: (state_batch_size, action_samples, action_dim)
+        '''
+        state_batch_size, action_samples, action_dim = tf.shape(supervise_actions)
+        states = tf.expand_dims(transitions.s, axis = 1) # (state_batch_size, 1, state_dim)
+        tiled_states = tf.tile(states,[1,action_samples,1]) #(state_batch_size, action_samples, state_dim)
+        reshaped_states = tf.reshape(tiled_states, shape = (state_batch_size * action_samples, -1)) 
+                                #(state_batch_size * action_samples, state_dim)
+        reshaped_supervise_actions = tf.reshape(supervise_actions, shape = (state_batch_size * action_samples, -1))
+                                #(state_batch_size * action_samples, action_dim)
+        taus = tf.random.uniform(shape=((state_batch_size * action_samples, action_dim)))
+        actions = self(reshaped_states, taus, reshaped_supervise_actions)
+                                #(state_batch_size * action_samples, action_dim)
+        weights = self.target_policy_density(mode, actions, reshaped_states, critic, value)
+        loss = self.huber_quantile_loss(actions, reshaped_supervise_actions, taus, weights)
+        
 
 class AutoRegressiveStochasticActor(IQNActor):
     def __init__(self, state_dim, action_dim, n_basis_functions):
@@ -177,7 +192,7 @@ class AutoRegressiveStochasticActor(IQNActor):
         # note the output is between [0, 1]
         self.dense_layer_2 = Dense(1, activation=tf.nn.tanh)
 
-    def __call__(self, state, taus, actions=None):
+    def __call__(self, state, taus, supervise_actions=None):
         """
         Analogous to the traditional call function in most models. This function conducts a single
         forward pass of the AIQN given the state.
@@ -186,15 +201,15 @@ class AutoRegressiveStochasticActor(IQNActor):
             state (tf.Variable): state vector containing a state with the format R^state_dim
             taus (tf.Variable): randomly sampled noise vector for sampling purposes. This vector
                 should be of shape (batch_size x actor_dimension)
-            actions (tf.Variable): set of previous actions
+            supervise_actions (tf.Variable): set of previous actions
 
         Returns:
             actions vector
         """
-        if actions is not None:
+        if supervise_actions is not None:
             # if the actions are defined then we use the supervised forward method which generates
             # actions based on the provided sequence
-            return self._supervised_forward(state, taus, actions)
+            return self._supervised_forward(state, taus, supervise_actions)
         batch_size = state.shape[0]
         # batch x 1 x 400
         state_embedding = tf.expand_dims(self.state_embedding(state), 1)
@@ -226,7 +241,7 @@ class AutoRegressiveStochasticActor(IQNActor):
         actions = tf.squeeze(tf.stack(action_list, axis=1), -1)
         return actions
 
-    def _supervised_forward(self, state, taus, actions):
+    def _supervised_forward(self, state, taus, supervise_actions):
         """
         Private function to conduct a supervised forward call. This is relying on the assumption
         actions are not independent to each other. With this assumption of "autocorrelation" between
@@ -252,9 +267,9 @@ class AutoRegressiveStochasticActor(IQNActor):
             )
         )
         # batch x action dim x 400
-        shifted_actions = tf.Variable(tf.zeros_like(actions))
+        shifted_actions = tf.Variable(tf.zeros_like(supervise_actions))
         # assign shifted actions
-        shifted_actions = shifted_actions[:, 1:].assign(actions[:, :-1])
+        shifted_actions = shifted_actions[:, 1:].assign(supervise_actions[:, :-1])
         provided_action_embedding = self.action_embedding(shifted_actions)
 
         rnn_input = tf.concat([state_embedding, provided_action_embedding], axis=2)
@@ -304,11 +319,12 @@ class StochasticActor(IQNActor):
             self.action_dim, activation= tf.nn.tanh,
             input_shape = (200,))
 
-    def __call__(self, states, taus):
+    def __call__(self, states, taus, supervise_actions = None):
         """
         Args:
             states: tensor (batch_size, state_dim)
             taus: tensor (batch_size, action_dim)
+            supervise_actions = None: to be consistent with AIQN. But is not used here.
         Return:
             next_actions: tensor (batch_size, action_dim)
         """
@@ -332,19 +348,26 @@ class Critic(tf.Module):
     the value of those states. The critic has two hidden layers and an output layer with size
     400, 300, and 1. All are fully connected layers.
 
+    Note that this is a black box critic which contains two networks. 
+    And we will always output the smaller predictions.
+    Double critic trick.
+
     Class Args:
-    state_dim (int): number of states
-    num_networks (int): number of critc networks need to be created
+    state_dim (int): dim of states
+    action_dim (int): dim of actions
     '''
     def __init__(self, state_dim, action_dim):
         super(Critic, self).__init__()
         self.state_dim = state_dim
         self.action_dim = action_dim
-        self.model = self._build_sequential_model(state_dim+action_dim)
+        self.model1 = self._build_sequential_model(state_dim+action_dim)
+        self.model2 = self._build_sequential_model(state_dim+action_dim)
 
     def __call__(self, states, actions):
         x = tf.concat([states, actions], -1)
-        return self.model.predict(x)
+        pred1 = self.model1.predict(x)
+        pred2 = self.model2.predict(x)
+        return tf.minimum(pred1, pred2)
 
     def _build_sequential_model(self, input_dim):
         # A helper function for building the graph
@@ -370,8 +393,10 @@ class Critic(tf.Module):
         Line 11-12 of Algorithm 2
         """
         x = tf.concat([transitions.s, transitions.a], -1)
-        history = self.model.fit(x, Q)
-        return history
+        history1 = self.model1.fit(x, Q)
+        history2 = self.model2.fit(x, Q)
+
+        return history1, history2
 
 
 class Value(tf.Module):
@@ -398,7 +423,7 @@ class Value(tf.Module):
         model.compile(optimizer='adam', loss='mse')
         return model
 
-    def train(self, transitions, actor, critic1, critic2, action_samples = 64):
+    def train(self, transitions, actor, critic, action_samples = 8):
         """
         transitions is of type named tuple policy.policy_helpers.helpers.Transition
         action_sampler is of type policy.policy_helpers.helpers.ActionSampler
@@ -429,22 +454,18 @@ class Value(tf.Module):
         """
         Line 14 of Algorithm 2.
         Get the Q value of the states and action samples.
+        Average over all action samples for Q1, Q2 and take the minimum.
+        Typo in Algorithm 2 line 14. 1/K is missed
         """
-        Q1, Q2 = critic1(states, actions), critic2(states, actions)
-        Q1 = tf.reshape(Q1, [-1, action_samples, 1])
-        Q2 = tf.reshape(Q2, [-1, action_samples, 1])
 
-        """
-        Line 14 of Algorithm 2.
-        Sum over all action samples for Q1, Q2 and take the minimum.
-        """
-        v1 = tf.reduce_mean(Q1, 1) #(batch_size, 1)
-        v2 = tf.reduce_mean(Q2, 1) #(batch_size, 1)
-        v_critic = tf.minimum(v1, v2) #(batch_size, 1) this is the value from critics
+        Q = critic(states, actions)
+        Q = tf.reshape(Q, [-1, action_samples, 1]) #(batch_size, action_samples, 1)
+        v_critic = tf.reduce_mean(Q, 1) #(batch_size, 1)
 
         """
         Line 15 of Algorithm 2.
         Get value of current state from the Value network.
         Loss is MSE.
         """
-        return self.model.fit(transitions.s, v_critic)
+        history = self.model.fit(transitions.s, v_critic)
+        return history

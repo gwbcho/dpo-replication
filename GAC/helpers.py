@@ -1,41 +1,9 @@
 import random
+import numpy as np
 from collections import namedtuple
 
 import tensorflow as tf
-"""
-A transition is made of state, action, reward, state', is_terminal.
-is_terminal flags if state is a terminal state, in which case this
-transition should not be counted when calculating reward.
-"""
-Transition = namedtuple(
-    'Transition',
-    ['s', 'a', 'r', 'sp', 'is_terminal']
-)
 
-
-class ReplayMemory(object):
-    """
-    Holds Transition tuple (s,a,r,sp,is_terminal) and provides random sampling of them.
-    """
-    def __init__(self, capacity):
-        self.capacity = capacity
-        self.memory = []
-        self.position = 0
-
-    def push(self, *args):
-        """
-        Saves a transition.
-        """
-        if len(self.memory) < self.capacity:
-            self.memory.append(None)
-        self.memory[self.position] = Transition(*args)
-        self.position = (self.position + 1) % self.capacity
-
-    def sample(self, n):
-        return random.sample(self.buffer, n)
-
-    def __len__(self):
-        return len(self.buffer)
 
 
 class ActionSampler():
@@ -63,13 +31,17 @@ class ActionSampler():
 
 
 class ReplayBuffer:
-    """
+    '''
     A simple FIFO experience replay buffer.
-    Copied from
+    Adapted from
     https://github.com/openai/spinningup/blob/master/spinup/algos/sac/sac.py (with The MIT License)
-    """
+    keep the shape in __init__ in mind.
+    '''
 
     def __init__(self, obs_dim, act_dim, size):
+        self.transitions = namedtuple('transition', ['s', 'a', 'r', 'sp', 'it'])
+        # (this_state, this_action, this_reward, next_state, this_is_terminal)
+
         self.obs1_buf = np.zeros([size, obs_dim], dtype=np.float32)
         self.obs2_buf = np.zeros([size, obs_dim], dtype=np.float32)
         self.acts_buf = np.zeros([size, act_dim], dtype=np.float32)
@@ -88,10 +60,25 @@ class ReplayBuffer:
 
     def sample_batch(self, batch_size=32):
         idxs = np.random.randint(0, self.size, size=batch_size)
-        return dict(
-            obs1=self.obs1_buf[idxs],
-            obs2=self.obs2_buf[idxs],
-            acts=self.acts_buf[idxs],
-            rews=self.rews_buf[idxs],
-            done=self.done_buf[idxs]
-        )
+        self.transitions.s = self.obs1_buf[idxs]
+        self.transitions.a = self.acts_buf[idxs]
+        self.transitions.r = self.rews_buf[idxs]
+        self.transitions.sp = self.obs2_buf[idxs]
+        self.transitions.it = self.done_buf[idxs]
+        return self.transitions
+
+
+
+def update(target, source, tau):
+    """
+    update function.
+    when tau = 1, then it's just assignment, i.e. hard update
+    Args:
+        target (tf.Variable): Variable containing target information
+        source (tf.Variable): Variable containing source information
+    """
+    for target_param, param in zip(target.trainable_parameters, source.trainable_parameters):
+        target_param.assign(target_param * (1.0 - tau) + param * tau)
+
+
+
