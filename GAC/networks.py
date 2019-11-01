@@ -352,19 +352,26 @@ class Critic(tf.Module):
     the value of those states. The critic has two hidden layers and an output layer with size
     400, 300, and 1. All are fully connected layers.
 
+    Note that this is a black box critic which contains two networks. 
+    And we will always output the smaller predictions.
+    Double critic trick.
+
     Class Args:
-    state_dim (int): number of states
-    num_networks (int): number of critc networks need to be created
+    state_dim (int): dim of states
+    action_dim (int): dim of actions
     '''
     def __init__(self, state_dim, action_dim):
         super(Critic, self).__init__()
         self.state_dim = state_dim
         self.action_dim = action_dim
-        self.model = self._build_sequential_model(state_dim+action_dim)
+        self.model1 = self._build_sequential_model(state_dim+action_dim)
+        self.model2 = self._build_sequential_model(state_dim+action_dim)
 
     def __call__(self, states, actions):
         x = tf.concat([states, actions], -1)
-        return self.model.predict(x)
+        pred1 = self.model1.predict(x)
+        pred2 = self.model2.predict(x)
+        return tf.minimum(pred1, pred2)
 
     def _build_sequential_model(self, input_dim):
         # A helper function for building the graph
@@ -390,8 +397,10 @@ class Critic(tf.Module):
         Line 11-12 of Algorithm 2
         """
         x = tf.concat([transitions.s, transitions.a], -1)
-        history = self.model.fit(x, Q)
-        return history
+        history1 = self.model1.fit(x, Q)
+        history2 = self.model2.fit(x, Q)
+
+        return history1, history2
 
 
 class Value(tf.Module):
@@ -418,7 +427,7 @@ class Value(tf.Module):
         model.compile(optimizer='adam', loss='mse')
         return model
 
-    def train(self, transitions, actor, critic1, critic2, action_samples = 64):
+    def train(self, transitions, actor, critic, action_samples = 8):
         """
         transitions is of type named tuple policy.policy_helpers.helpers.Transition
         action_sampler is of type policy.policy_helpers.helpers.ActionSampler
@@ -449,22 +458,18 @@ class Value(tf.Module):
         """
         Line 14 of Algorithm 2.
         Get the Q value of the states and action samples.
+        Average over all action samples for Q1, Q2 and take the minimum.
+        Typo in Algorithm 2 line 14. 1/K is missed
         """
-        Q1, Q2 = critic1(states, actions), critic2(states, actions)
-        Q1 = tf.reshape(Q1, [-1, action_samples, 1])
-        Q2 = tf.reshape(Q2, [-1, action_samples, 1])
 
-        """
-        Line 14 of Algorithm 2.
-        Sum over all action samples for Q1, Q2 and take the minimum.
-        """
-        v1 = tf.reduce_mean(Q1, 1) #(batch_size, 1)
-        v2 = tf.reduce_mean(Q2, 1) #(batch_size, 1)
-        v_critic = tf.minimum(v1, v2) #(batch_size, 1) this is the value from critics
+        Q = critic(states, actions)
+        Q = tf.reshape(Q, [-1, action_samples, 1]) #(batch_size, action_samples, 1)
+        v_critic = tf.reduce_mean(Q, 1) #(batch_size, 1)
 
         """
         Line 15 of Algorithm 2.
         Get value of current state from the Value network.
         Loss is MSE.
         """
-        return self.model.fit(transitions.s, v_critic)
+        history = self.model.fit(transitions.s, v_critic)
+        return history
