@@ -1,3 +1,7 @@
+from collections import deque
+import random
+
+
 import numpy as np
 import tensorflow as tf
 from tensorflow.keras import Sequential
@@ -15,17 +19,19 @@ classes, if for no other reason than legibility.
 
 
 class CosineBasisLinear(tf.Module):
-    def __init__(self, n_basis_functions, embed_dim):
+    def __init__(self, n_basis_functions, embed_dim, activation = None):
         """
         Parametrize the embedding function using Fourier series up to n_basis_functions terms.
-        It's an entry-wise embedding function, i.e. from R to R^d.
+        It's an entry-wise embedding function, i.e. from R to R^d. Could do nonlinear transform
+        with activation in the end.
         Class Args:
             n_basis_functions (int): the number of basis functions
             embed_dim (int): the dimensionality of embedding
+            activation (tf.function): activation function. 
         """
         super(CosineBasisLinear, self).__init__()
         # coefficient of the basis
-        self.act_linear = tf.keras.layers.Dense(embed_dim,input_shape = (n_basis_functions,))
+        self.act_linear = Dense(embed_dim, activation = activation, input_shape = (n_basis_functions,))
         self.n_basis_functions = n_basis_functions
         self.embed_dim = embed_dim
 
@@ -55,7 +61,7 @@ class CosineBasisLinear(tf.Module):
         h = self._cosine_basis_functions(x, self.n_basis_functions)
             # (size of x , n_basis_functions)
         out = self.act_linear(h) # (size of x , embed_dim)
-        out = tf.reshape(out, (batch_size, -1, self.embed_dim))
+        out = tf.reshape(out, (batch_size, -1, self.embed_dim)) #(batch_size, a, embed_dim)
         return out
 
 
@@ -63,7 +69,7 @@ class IQNSuperClass(tf.Module):
     def __init__(self):
         super(IQNSuperClass, self).__init__()
         self.module_type = 'IQNSuperClass'
-        self.huber_loss_function = tf.keras.losses.Huber(delta=1.0)  # delta is kappa in paper
+        
 
     def target_policy_density(self, mode, actions, states, critic, value):
         '''
@@ -89,7 +95,7 @@ class IQNSuperClass(tf.Module):
         else:
             raise NotImplementedError
 
-    def compute_eltwise_huber_quantile_loss(self, actions, target_actions, taus, weighting):
+    def huber_quantile_loss(self, actions, target_actions, taus, weighting):
         """
         Compute elementwise Huber losses for quantile regression.
         This is based on Algorithm 1 of https://arxiv.org/abs/1806.06923.
@@ -112,8 +118,10 @@ class IQNSuperClass(tf.Module):
             Loss for IQN super class
         """
         I_delta = tf.dtypes.cast(((actions - target_actions) > 0), tf.float32)
-        eltwise_huber_loss = self.huber_loss_function(target_actions, actions)
+        eltwise_huber_loss = tf.keras.losses.Huber(delta=1.0)(target_actions, actions)
+        # delta is kappa in paper
         eltwise_loss = tf.math.abs(taus - I_delta) * eltwise_huber_loss * weighting
+
         return tf.math.reduce_mean(eltwise_loss)
 
 
@@ -133,7 +141,7 @@ class AutoRegressiveStochasticActor(IQNSuperClass):
         # create all necessary class variables
         self.module_type = 'AutoRegressiveStochasticActor'
         self.action_dim = action_dim
-        self.state_embedding = tf.keras.layers.Dense(
+        self.state_embedding = Dense(
             400,  # as specified by the architecture in the paper and in their code
             activation=tf.nn.leaky_relu
         )
@@ -145,10 +153,10 @@ class AutoRegressiveStochasticActor(IQNSuperClass):
         # construct the GRU to ensure autoregressive qualities of our samples
         self.rnn = tf.keras.layers.GRU(400, return_state=True, return_sequences=True)
         # post processing linear layers
-        self.dense_layer_1 = tf.keras.layers.Dense(400, activation=tf.nn.leaky_relu)
+        self.dense_layer_1 = Dense(400, activation=tf.nn.leaky_relu)
         # output layer (produces the sample from the implicit quantile function)
         # note the output is between [0, 1]
-        self.dense_layer_2 = tf.keras.layers.Dense(1, activation=tf.nn.tanh)
+        self.dense_layer_2 = Dense(1, activation=tf.nn.tanh)
 
     def __call__(self, state, taus, actions=None):
         """
@@ -244,13 +252,14 @@ class AutoRegressiveStochasticActor(IQNSuperClass):
 
 
 class StochasticActor(IQNSuperClass):
-    def __init__(self, action_dim, n_basis_functions=64):
+    def __init__(self, state_dim, action_dim, n_basis_functions=64):
         """
         The IQN stochasitc action generator, takes state and tau (random vector) as input, and output
         the next action. This generator is not in an autoregressive way, i.e. the next action is
         generated as a whole, instead of one dimension by one dimension.
 
         Class Args:
+            state_dim (int): the dimensionality of the state vector
             action_dim (int): the dimensionality of the action vector
             n_basis_functions (int): the number of basis functions for noise embedding.
         """
@@ -266,7 +275,7 @@ class StochasticActor(IQNSuperClass):
     def __call__(self, states, taus):
         """
         Args:
-            state: tensor (batch_size, state_dim)
+            states: tensor (batch_size, state_dim)
             taus: tensor (batch_size, action_dim)
         Return:
             next_actions: tensor (batch_size, action_dim)
@@ -382,7 +391,42 @@ class Value():
         Get value of current state from the Value network.
         Loss is MSE.
         """
+
         return self.model.fit(transitions.s, v_true)
 
     def __call__(self, states):
         return self.model.predict(states)
+
+
+class ReplayBuffer:
+    """
+    A simple FIFO experience replay buffer.
+    Copied from 
+    https://github.com/openai/spinningup/blob/master/spinup/algos/sac/sac.py (with The MIT License)
+    """
+
+    def __init__(self, obs_dim, act_dim, size):
+        self.obs1_buf = np.zeros([size, obs_dim], dtype=np.float32)
+        self.obs2_buf = np.zeros([size, obs_dim], dtype=np.float32)
+        self.acts_buf = np.zeros([size, act_dim], dtype=np.float32)
+        self.rews_buf = np.zeros(size, dtype=np.float32)
+        self.done_buf = np.zeros(size, dtype=np.float32)
+        self.ptr, self.size, self.max_size = 0, 0, size
+
+    def store(self, obs, act, rew, next_obs, done):
+        self.obs1_buf[self.ptr] = obs
+        self.obs2_buf[self.ptr] = next_obs
+        self.acts_buf[self.ptr] = act
+        self.rews_buf[self.ptr] = rew
+        self.done_buf[self.ptr] = done
+        self.ptr = (self.ptr+1) % self.max_size
+        self.size = min(self.size+1, self.max_size)
+
+    def sample_batch(self, batch_size=32):
+        idxs = np.random.randint(0, self.size, size=batch_size)
+        return dict(obs1=self.obs1_buf[idxs],
+                    obs2=self.obs2_buf[idxs],
+                    acts=self.acts_buf[idxs],
+                    rews=self.rews_buf[idxs],
+                    done=self.done_buf[idxs])
+
