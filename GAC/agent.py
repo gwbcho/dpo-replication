@@ -85,7 +85,7 @@ class GACAgent:
         """
 
         """ Sample actions """
-        actions = self.action_sampler.get_actions(self.actor, states)
+        actions = self.action_sampler.get_actions(self.target_actor, states)
         actions = tf.concat([actions, tf.random.uniform(actions.shape, minval=-1.0, maxval=1.0)], 0)
         states = tf.concat([states, states], 0)
         
@@ -103,7 +103,7 @@ class GACAgent:
 
 
     def get_action(self, states):
-        return self.action_sampler.get_actions(self.target_actor, states) 
+        return self.action_sampler.get_actions(self.actor, states) 
 
     def store_transitions(self, state, action, reward, next_state, is_done):
         self.replay.store(state, action, reward, next_state, is_done)
