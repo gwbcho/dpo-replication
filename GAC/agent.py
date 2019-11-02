@@ -46,7 +46,7 @@ class GACAgent:
         update(self.target_value, self.value, 1.0)
 
         self.replay = ReplayBuffer(args.state_dim, args.action_dim, args.buffer_size) 
-        
+        self.action_sampler = ActionSampler(self.actor.action_dim)
 
 
     
@@ -60,7 +60,7 @@ class GACAgent:
         critic_history = self.critic.train(transitions, self.target_value, self.args.gamma)
         value_history = self.value.train(
                 transitions,
-                # ActionSampler(self.actor.action_dim) # WE WILL DECIDE WHETHER WE NEED THIS LATER
+                # self.action_sampler # WE WILL DECIDE WHETHER WE NEED THIS LATER
                 self.target_actor,
                 self.target_critic,
                 self.args.action_samples
@@ -85,7 +85,7 @@ class GACAgent:
         """
 
         """ Sample actions """
-        actions = ActionSampler(self.actor.action_dim).get_actions(self.actor, states)
+        actions = self.action_sampler.get_actions(self.actor, states)
         actions = tf.concat([actions, tf.random.uniform(actions.shape, minval=-1.0, maxval=1.0)], 0)
         states = tf.concat([states, states], 0)
         
@@ -103,7 +103,7 @@ class GACAgent:
 
 
     def get_action(self, states):
-        return ActionSampler(self.actor.action_dim).get_actions(self.target_actor, states) 
+        return self.action_sampler.get_actions(self.target_actor, states) 
 
     def store_transitions(self, state, action, reward, next_state, is_done):
         self.replay.store(state, action, reward, next_state, is_done)
