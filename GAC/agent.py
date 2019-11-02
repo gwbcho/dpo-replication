@@ -40,6 +40,7 @@ class GACAgent:
         self.value = Value(args.state_dim)
         self.target_value = Value(args.state_dim)
 
+        # initialize the target networks.
         update(self.target_actor, self.actor, 1.0)
         update(self.target_critic, self.critic, 1.0)
         update(self.target_value, self.value, 1.0)
