@@ -89,7 +89,7 @@ class IQNActor(tf.Module):
         """
         raise NotImplementedError
 
-    def target_density(self, mode, advantage):
+    def target_density(self, mode, advantage, beta):
         """
         The density of target policy D(a|s). Comes from table 1 in the paper.
 
@@ -103,7 +103,6 @@ class IQNActor(tf.Module):
         if mode == "linear":
             return advantage / tf.reduce_sum(advantage)
         elif mode == "boltzmann":
-            beta = 1.0
             return tf.nn.softmax(advantage/beta)
         else:
             raise NotImplementedError
@@ -133,7 +132,7 @@ class IQNActor(tf.Module):
         return tf.math.reduce_mean(eltwise_loss) * self.action_dim
              # mean over batches, sum over action dimensions, according to Algorithm 2.
 
-    def train(self, states, supervise_actions, advantage, mode):
+    def train(self, states, supervise_actions, advantage, mode, beta):
         '''
         the batch_size here combines the state_batch_size and action samples.
         states: (batch_size,  state_dim)
@@ -142,7 +141,7 @@ class IQNActor(tf.Module):
         '''
         
         taus = tf.random.uniform(tf.shape(supervise_actions))
-        weights = self.target_density(mode, advantage)
+        weights = self.target_density(mode, advantage, beta)
 
         with tf.GradientTape() as tape:
             actions = self(states, taus, supervise_actions) #(batch_size, action_dim)
