@@ -69,7 +69,7 @@ class ReplayBuffer:
 
 
 
-def update(target, source, tau):
+def update(target, source, rate):
     """
     update function.
     when tau = 1, then it's just assignment, i.e. hard update
@@ -78,7 +78,7 @@ def update(target, source, tau):
         source (tf.Variable): Variable containing source information
     """
     for target_param, param in zip(target.trainable_parameters, source.trainable_parameters):
-        target_param.assign(target_param * (1.0 - tau) + param * tau)
+        target_param.assign(target_param * (1.0 - rate) + param * rate)
 
 
 

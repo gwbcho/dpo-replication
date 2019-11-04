@@ -62,13 +62,17 @@ class CosineBasisLinear(tf.Module):
 
 
 class IQNActor(tf.Module):
-    def __init__(self):
+    def __init__(self, state_dim, action_dim):
         super(IQNActor, self).__init__()
+        self.state_dim = state_dim
+        self.action_dim = action_dim 
+        # we will use in the loss function.
+
         self.module_type = 'IQNActor'
         self.huber_loss_function = tf.keras.losses.Huber(delta=1.0)  # delta is kappa in paper
         self.optimizer = tf.keras.optimizers.Adam(0.0001)
 
-    def __call__(self, state, taus, actions=None):
+    def __call__(self, state, taus, supervise_actions=None):
         """
         Signature for all IQN related classes' __call__ functions. Note that actions is an optional
         argument. This function is simply meant as a placeholder/stencil. It is not actually
@@ -78,14 +82,14 @@ class IQNActor(tf.Module):
             state (tf.Variable): state vector containing a state with the format R^state_dim
             taus (tf.Variable): randomly sampled noise vector for sampling purposes. This vector
                 should be of shape (batch_size x actor_dimension)
-            actions (tf.Variable): set of previous actions
+            supervise_actions (tf.Variable): set of previous actions
 
         Raise:
             NotImplementedError (this is a template function)
         """
         raise NotImplementedError
 
-    def target_density(self, mode, advantage):
+    def target_density(self, mode, advantage, beta):
         """
         The density of target policy D(a|s). Comes from table 1 in the paper.
 
@@ -99,52 +103,45 @@ class IQNActor(tf.Module):
         if mode == "linear":
             return advantage / tf.reduce_sum(advantage)
         elif mode == "boltzmann":
-            beta = 1.0
             return tf.nn.softmax(advantage/beta)
         else:
             raise NotImplementedError
 
     def huber_quantile_loss(self, actions, target_actions, taus, weights):
         """
-        Compute elementwise Huber losses for quantile regression.
-        This is based on Algorithm 1 of https://arxiv.org/abs/1806.06923.
-        This function assumes that, both of the two kinds of quantile thresholds,
-        taus (used to compute y) and taus_prime (used to compute t) are iid samples
-        from U([0,1]).
+        Compute Huber losses for quantile regression.
 
         rho function in the paper = |taus - (target_actions - action) < 0| * huber_loss
 
         Args:
-            actions (tf.Variable): Quantile prediction from taus as a
-                (batch_size, N, K)-shaped array.
-            target_actions (tf.Variable): Quantile targets from taus as a
-                (batch_size, N, K)-shaped array.
-            taus (tf.Variable): Quantile thresholds used to compute y as a
-                (batch_size, N, 1)-shaped array.
-            weights (tf.Variable): The density of target action distribution (D) as a
-                (batch_size, N, K)-shaped array.
+            actions (tf.Tensor): (batch_size, action_dim), Quantile prediction from taus
+            target_actions (tf.Tensor): (batch_size, action_dim)
+            taus (tf.Variable): (batch_size, action_dim)
+            weights (tf.Variable): (batch_size, 1), The density of target action distribution D(a|s) 
 
         Returns:
-            Loss for IQN super class
+            Huber quantile loss
         """
+
         I_delta = tf.dtypes.cast(((actions - target_actions) > 0), tf.float32)
         eltwise_huber_loss = self.huber_loss_function(target_actions, actions)
         # delta is kappa in paper
-        eltwise_loss = tf.math.abs(taus - I_delta) * eltwise_huber_loss * weights
+        eltwise_loss = tf.math.abs(taus - I_delta) * eltwise_huber_loss * weights 
+        #(batch_size, action_dim)
 
-        return tf.math.reduce_mean(eltwise_loss)
+        return tf.math.reduce_mean(eltwise_loss) * self.action_dim
+             # mean over batches, sum over action dimensions, according to Algorithm 2.
 
-    def train(self, states, supervise_actions, advantage, mode):
+    def train(self, states, supervise_actions, advantage, mode, beta):
         '''
-        supervise_actions is the a_hat in the paper Algorithm 2.
-        transitions: the turple of transitions
+        the batch_size here combines the state_batch_size and action samples.
         states: (batch_size,  state_dim)
         supervise_actions: (batch_size, action_dim)
         advantage: (batch_size, 1)
         '''
         
         taus = tf.random.uniform(tf.shape(supervise_actions))
-        weights = self.target_density(mode, advantage)
+        weights = self.target_density(mode, advantage, beta)
 
         with tf.GradientTape() as tape:
             actions = self(states, taus, supervise_actions) #(batch_size, action_dim)
@@ -156,21 +153,20 @@ class IQNActor(tf.Module):
 
 
 class AutoRegressiveStochasticActor(IQNActor):
-    def __init__(self, state_dim, action_dim, n_basis_functions):
+    def __init__(self, state_dim, action_dim, n_basis_functions = 64):
         """
         the autoregressive stochastic actor is an implicit quantile network used to sample from a
         distribution over optimal actions. The model maintains it's autoregressive quality due to
         the recurrent network used.
 
         Class Args:
-            state_dim (int): number of inputs used for state embedding, I think this is state dim?
+            state_dim (int): the dimensionality of the state vector
             action_dim (int): the dimensionality of the action vector
             n_basis_functions (int): the number of basis functions
         """
-        super(AutoRegressiveStochasticActor, self).__init__()
+        super(AutoRegressiveStochasticActor, self).__init__(state_dim, action_dim)
         # create all necessary class variables
         self.module_type = 'AutoRegressiveStochasticActor'
-        self.action_dim = action_dim
         self.state_embedding = Dense(
             400,  # as specified by the architecture in the paper and in their code
             activation=tf.nn.leaky_relu
@@ -293,15 +289,15 @@ class StochasticActor(IQNActor):
             action_dim (int): the dimensionality of the action vector
             n_basis_functions (int): the number of basis functions for noise embedding.
         """
-        super(StochasticActor, self).__init__()
+        super(StochasticActor, self).__init__(state_dim, action_dim)
         self.module_type = 'StochasticActor'
         self.noise_embed_dim = 400 // action_dim
-        self.action_dim = action_dim
+
 
         self.state_embedding_layer = Dense(
             self.noise_embed_dim * self.action_dim,
             activation=tf.keras.layers.LeakyReLU(alpha=0.01),
-            input_shape = (state_dim,))
+            input_shape = (self.state_dim,))
 
         self.noise_embedding_layer = CosineBasisLinear(
             n_basis_functions, self.noise_embed_dim,

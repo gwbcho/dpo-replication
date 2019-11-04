@@ -2,235 +2,108 @@
 import numpy as np
 import tensorflow as tf
 
-# internal dependencies
-import utils.utils as utils
-
 # import local dependencies
-import GAC.networks as networks
-import GAC.helpers as helpers
+from GAC.networks import StochasticActor, AutoRegressiveStochasticActor,  Critic, Value
+from GAC.helpers import ReplayBuffer, update, ActionSampler
 
 
 """
 File Description:
 
-This file hosts the GACAgent class which is a form of policy. The purpose of this class is to
-unify the networks constructed for GAC in networks and construct a generator function which
-follows an optimal stationary stochastic policy.
+Class: Generative Actor Critic (GAC) agent.
 """
 
 
 class GACAgent:
     """
-    Class to construct a generative policy which samples from an optimally constructed
-    distribution over continuous action space.
+    GAC agent. 
+    Action is alway from -1 to 1 in each dimension.
+    Will not do normalization.
     """
 
-    def __init__(self, gamma, soft_update_rate, state_dim, action_space, replay_size,
-                 normalize_obs=False, normalize_returns=False, num_basis_functions=64,
-                 num_outputs=1, use_value=True, q_normalization=0.01, target_policy='linear',
-                 target_policy_q='min', autoregressive=True, temp=1.0):
+    def __init__(self, args):
 
-        # TODO: Construct function as specified in the paper
-        self.state_dim = state_dim
-        self.action_space = action_space
-        self.num_outputs = num_outputs
-        self.num_basis_functions = num_basis_functions
-        self.action_dim = self.action_space.shape[0]
-        self.use_value = use_value
-        self.q_normalization = q_normalization
-        self.target_policy = target_policy
-        self.autoregressive = autoregressive
-        self.temp = temp
+        self.args = args
 
-        # initial Policy class initialized values
-        self.gamma = gamma
-        self.soft_update_rate = soft_update_rate
-        self.normalize_observations = normalize_obs
-        self.normalize_returns = normalize_returns
+        if args.actor == 'IQN':
+            self.actor = StochasticActor(args.state_dim,args.action_dim)
+            self.target_actor = StochasticActor(args.state_dim,args.action_dim)
+            
+            
+        elif args.actor == 'AIQN':
+            self.actor = AutoRegressiveStochasticActor(args.state_dim,args.action_dim)
+            self.target_actor = AutoRegressiveStochasticActor(args.state_dim,args.action_dim)
 
-        if self.normalize_observations:
-            self.obs_rms = utils.RunningMeanStd(shape=state_dim)
-        else:
-            self.obs_rms = None
+        self.critic = Critic(args.state_dim, args.action_dim)
+        self.target_critic = Critic(args.state_dim, args.action_dim)
 
-        if self.normalize_returns:
-            self.ret_rms = utils.RunningMeanStd(shape=1)
-            self.ret = 0
-            self.cliprew = 10.0
-        else:
-            self.ret_rms = None
+        self.value = Value(args.state_dim)
+        self.target_value = Value(args.state_dim)
 
-        self.memory = helpers.ReplayMemory(replay_size)
-        self.actor = None
-        self.actor_perturbed = None
-        self.policy = helpers.ActionSampler(self.action_dim)
+        # initialize the target networks.
+        update(self.target_actor, self.actor, 1.0)
+        update(self.target_critic, self.critic, 1.0)
+        update(self.target_value, self.value, 1.0)
 
-        if target_policy_q == 'min':
-            self.target_policy_q = lambda x, y: tf.math.minimum(x, y)
-        elif target_policy_q == 'max':
-            self.target_policy_q = lambda x, y: tf.math.minimum(x, y)
-        else:
-            self.target_policy_q = lambda x, y: (x + y / 2)
+        self.replay = ReplayBuffer(args.state_dim, args.action_dim, args.buffer_size) 
+        self.action_sampler = ActionSampler(self.actor.action_dim)
 
-        if self.autoregressive:
-            self.actor = networks.AutoRegressiveStochasticActor(
-                self.state_dim,
-                self.action_dim,
-                self.num_basis_functions
-            )
-            self.actor_target = networks.AutoRegressiveStochasticActor(
-                self.state_dim,
-                self.action_dim,
-                self.num_basis_functions
-            )
-            self.actor_perturbed = networks.AutoRegressiveStochasticActor(
-                self.state_dim,
-                self.action_dim,
-                self.num_basis_functions
-            )
 
-        else:
-            self.actor = networks.StochasticActor(
-                self.state_dim,
-                self.action_dim,
-                self.num_basis_functions
-            )
-            self.actor_target = networks.StochasticActor(
-                self.state_dim,
-                self.action_dim,
-                self.num_basis_functions
-            )
-            self.actor_perturbed = networks.StochasticActor(
-                self.state_dim,
-                self.action_dim,
-                self.num_basis_functions
-            )
+    
+    def train_one_step(self):
+        """
+        execute one update for each of the networks
+        """
 
-        self.actor_optimizer = tf.keras.optimizers.Adam(learning_rate=1e-3)
-
-        self.critic = networks.Critic(self.state_dim + self.action_dim, num_networks=2)
-        self.critic_target = networks.Critic(self.state_dim + self.action_dim, num_networks=2)
-        self.critic_optimizer = tf.keras.optimizers.Adam(learning_rate=1e-3)
-
-        self.value = networks.Value(self.state_dim)
-        self.value_target = networks.Value(self.state_dim)
-        self.value_optimizer = tf.keras.optimizers.Adam(learning_rate=1e-3)
-
-    def select_action(self, state, action_noise=None, param_noise=None):
-        state = helpers.normalize(
-            tf.Variable(state),
-            self.obs_rms
-        )
-
-        if param_noise is not None:
-            action = self.policy.get_actions(self.actor_perturbed, state)[0]
-        else:
-            action = self.policy.get_actions(self.actor, state)[0]
-
-        if action_noise is not None:
-            action += tf.Variable(action_noise())
-
-        action = tf.clip_by_value(action, -1, 1)
-
-        return action
-
-    def store_transition(self, state, action, mask, next_state, reward):
-        B = state.shape[0]
-        for b in range(B):
-            self.memory.push(state[b], action[b], mask[b], next_state[b], reward[b])
-            if self.normalize_observations:
-                self.obs_rms.update(state[b])
-            if self.normalize_returns:
-                self.ret = self.ret * self.gamma + reward[b]
-                self.ret_rms.update(np.array([self.ret]))
-                if mask[b] == 0:  # if terminal is True
-                    self.ret = 0
-
-    def update_parameters(self, batch_size):
-        transitions = self.memory.sample(batch_size)
-        batch = helpers.Transition(*zip(*transitions))
-
-        state_batch = helpers.normalize(
-            tf.Variable(
-                tf.stack(batch.state)
-            ),
-            self.obs_rms
-        )
-
-        action_batch = tf.Variable(tf.stack(batch.action))
-        reward_batch = helpers.normalize(
-            tf.Variable(
-                tf.expand_dims(
-                    tf.stack(batch.reward),
-                    1
+        transitions = self.replay.sample_batch(self.args.batch_size) 
+        # transitions is sampled from replay buffer
+        critic_history = self.critic.train(transitions, self.target_value, self.args.gamma)
+        value_history = self.value.train(
+                transitions,
+                # self.action_sampler # WE WILL DECIDE WHETHER WE NEED THIS LATER
+                self.target_actor,
+                self.target_critic,
+                self.args.action_samples
                 )
-            ),
-            self.ret_rms
-        )
-        mask_batch = tf.Variable(
-            tf.expand_dims(
-                tf.stack(batch.mask),
-                1
-            )
-        )
-        next_state_batch = helpers.normalize(
-            tf.Variable(
-                tf.stack(batch.next_state)
-            ),
-            self.obs_rms
-        )
+        states, actions, advantages = self._sample_positive_advantage_actions(transitions.s)
+        actor_history = self.actor.train(states, actions, advantages, self.args.mode, self.args.beta)
 
-        if self.normalize_returns:
-            reward_batch = tf.clip_by_value(reward_batch, -self.cliprew, self.cliprew)
+        update(self.target_actor, self.actor, self.args.soft_rate)
+        update(self.target_critic, self.critic, self.args.soft_rate)
+        update(self.target_value, self.value, self.args.soft_rate)
 
-        value_loss = self.update_critic(
-            state_batch,
-            action_batch,
-            reward_batch,
-            mask_batch,
-            next_state_batch
-        )
-        policy_loss = self.update_actor(state_batch)
 
-        self.soft_update()
+        return critic_history, value_history, actor_history
 
-        return value_loss, policy_loss
 
-    def perturb_actor_parameters(self, param_noise):
+    def _sample_positive_advantage_actions(self, states):
         """
-        Apply parameter noise to actor model, for exploration
+        Sample from the target network and a uniform distribution.
+        Then only keep the actions with positive advantage.
+        Returning one action per state, if more needed, make states contain the
+        same state multiple times.
         """
-        helpers.hard_update(self.actor_perturbed, self.actor)
-        params = self.actor_perturbed.state_dict()
-        for name in params:
-            if 'ln' in name:
-                pass
-            param = params[name]
-            param += tf.random.normal(param.shape) * param_noise.current_stddev
 
-    def _tile(self, a, dim, n_tile):
-        init_dim = a.shape[dim]
-        num_dims = len(a.shape)
-        repeat_idx = [1] * num_dims
-        repeat_idx[dim] = n_tile
-        tiled_results = tf.tile(a, repeat_idx)
-        order_index = tf.Variable(
-            np.concatenate(
-                [init_dim * np.arange(n_tile) + i for i in range(init_dim)]
-            ),
-            dtype=tf.int64
-        )
-        return tf.gather_nd(tiled_results, order_index, dim)
+        """ Sample actions """
+        actions = self.action_sampler.get_actions(self.target_actor, states)
+        actions = tf.concat([actions, tf.random.uniform(actions.shape, minval=-1.0, maxval=1.0)], 0)
+        states = tf.concat([states, states], 0)
+        
+        """ compute Q and V """
+        q = self.critic(states, actions)
+        v = self.value(states)
 
-    # TODO: implement the following functions
-    def update_critic(self, state_batch, action_batch, reward_batch, mask_batch, next_state_batch):
-        raise NotImplementedError
+        """ select s, a with positive advantage """
+        indices = tf.squeeze(tf.where(q > v))
+        good_states = tf.gather(states, indices)
+        good_actions = tf.gather(actions, indices)
+        advantages = tf.gather(q-v, indices)
 
-    def update_actor(self, state_batch):
-        raise NotImplementedError
+        return good_states, good_actions, advantages   
 
-    def soft_update(self):
-        raise NotImplementedError
 
-    def eval(self):
-        raise NotImplementedError
+    def get_action(self, states):
+        return self.action_sampler.get_actions(self.actor, states) 
+
+    def store_transitions(self, state, action, reward, next_state, is_done):
+        self.replay.store(state, action, reward, next_state, is_done)
