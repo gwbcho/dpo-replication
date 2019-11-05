@@ -5,10 +5,10 @@ import gym
 import numpy as np
 import tensorflow as tf
 
-from environment.normalized_actions import NormalizedActions
-from policies.gac.networks import AutoRegressiveStochasticActor as AIQN
-from policies.gac.networks import StochasticActor as IQN
-from policies.gac.networks import Critic, Value
+from GAC.networks import AutoRegressiveStochasticActor as AIQN
+from GAC.networks import StochasticActor as IQN
+from GAC.networks import Critic, Value
+from GAC.agent import GACAgent
 
 
 def create_argument_parser():
@@ -30,7 +30,7 @@ def create_argument_parser():
             help='number of training epochs (default: None)')
     parser.add_argument('--epochs_cycles', type=int, default=20, metavar='N')
     parser.add_argument('--rollout_steps', type=int, default=100, metavar='N')
-    parser.add_argument('--train_steps', type=int, default=2000000, metavar='N',
+    parser.add_argument('--T', type=int, default=2000000, metavar='N',
             help='number of training steps (default: 2000000)')
     parser.add_argument('--model_path', type=str, default='/tmp/dpo/',
             help='trained model is saved to this location')
@@ -38,7 +38,7 @@ def create_argument_parser():
     parser.add_argument('--start_timesteps', type=int, default=10000, metavar='N')
     parser.add_argument('--eval_freq', type=int, default=5000, metavar='N')
     parser.add_argument('--eval_episodes', type=int, default=10, metavar='N')
-    parser.add_argument('--replay_size', type=int, default=1000000, metavar='N',
+    parser.add_argument('--buffer_size', type=int, default=1000000, metavar='N',
             help='size of replay buffer (default: 1000000)')
     parser.add_argument('--policy_type', default='ddpg', choices=['ddpg', 'generative'])
     parser.add_argument('--num_outputs', type=int, default=1)
@@ -46,7 +46,7 @@ def create_argument_parser():
     parser.add_argument('--experiment_name', default=None, type=str,
             help='For multiple different experiments, provide an informative experiment name')
     parser.add_argument('--print', default=False, action='store_true')
-    parser.add_argument('--auto-regressive', default=False, action='store_true')
+    parser.add_argument('--actor', default='IQN', choices=['IQN', 'AIQN'])
     parser.add_argument('--normalize_obs', default=False, action='store_true', help='Normalize observations')
     parser.add_argument('--normalize_rewards', default=False, action='store_true', help='Normalize rewards')
     parser.add_argument('--q_normalization', type=float, default=0.01,
@@ -58,8 +58,6 @@ def create_argument_parser():
     parser.add_argument('--boltzman_temperature', type=float, default=1.0,
             help='Boltzman Temperature for normalizing actions')
     return parser
-
-
 
 
 def evaluate_policy(policy, env, episodes):
@@ -78,40 +76,39 @@ def evaluate_policy(policy, env, episodes):
                 break
     return total_reward / episodes
 
-def train_one_step(args):
-    pass
-
-def train(args):
-    for t in range(args.train_steps):
-        train_one_step(args)
-
-
 
 def main():
     args = create_argument_parser().parse_args()
 
     """
-    Create Mujoko environment
+    Create Mujoco environment
     """
     env = gym.make(args.environment)
-    action_dim = env.action_space.shape[0]
-    state_dim = env.observation_space.shape[0]
+    args.action_dim = env.action_space.shape[0]
+    args.state_dim = env.observation_space.shape[0]
+
+    gac = GACAgent(args)
+
+    state = env.reset()
 
     """
-    Create actor, critic, value and their targets
+    training loop
     """
-    Actor = AIQN if args.auto_regressive else IQN
-    actor = Actor(action_dim)
-    critic1 = Critic(state_dim, action_dim)
-    critic2 = Critic(state_dim, action_dim)
-    value = Value(state_dim)
-    target_actor = Actor(action_dim)
-    target_critic1 = Critic(state_dim, action_dim)
-    target_critic2 = Critic(state_dim, action_dim)
-    target_value = Value(state_dim)
+    for t in range(args.T):
+        """
+        Get an action from neural network and run it in the environment
+        """
+        action = gac.get_action(tf.convert_to_tensor([state]))
+        next_state, reward, is_terminal, _ = env.step(action)
+        gac.store_transitions(state, action, reward, next_state, is_terminal)
+        if is_terminal:
+            state = env.reset()
+        else:
+            state = next_state
 
+        if gac.replay.size >= args.batch_size:
+            gac.train_one_step()
 
-    train(args)
 
 if __name__ == '__main__':
     main()
