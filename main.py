@@ -101,10 +101,7 @@ def main():
         action = gac.get_action(tf.convert_to_tensor([state]))
         next_state, reward, is_terminal, _ = env.step(action)
         gac.store_transitions(state, action, reward, next_state, is_terminal)
-        if is_terminal:
-            state = env.reset()
-        else:
-            state = next_state
+        state = env.reset() if is_terminal else next_state
 
         if gac.replay.size >= args.batch_size:
             gac.train_one_step()
