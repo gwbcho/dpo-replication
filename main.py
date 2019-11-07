@@ -95,7 +95,7 @@ def main():
                     'eval_rewards': [],
                     'actor_losses': [],
                     'value_losses': [],
-                    'policy_losses': [],
+                    'critic_losses': [],
                     
                     }
     episode_steps, episode_rewards = 0, 0 # total steps and rewards for each episode
@@ -113,7 +113,7 @@ def main():
         # check if game is terminated to decide how to update state, episode_steps, episode_rewards
         if is_terminal:
             state = env.reset()
-            results_dict['train_rewards'].apped((t, np.mean(episode_rewards)))
+            results_dict['train_rewards'].apped((t, episode_rewards / episode_steps))
             episode_steps = 0
             episode_rewards = 0 
         else:
