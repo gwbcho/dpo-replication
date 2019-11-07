@@ -45,8 +45,8 @@ class ReplayBuffer:
         self.obs1_buf = np.zeros([size, obs_dim], dtype=np.float32)
         self.obs2_buf = np.zeros([size, obs_dim], dtype=np.float32)
         self.acts_buf = np.zeros([size, act_dim], dtype=np.float32)
-        self.rews_buf = np.zeros(size, dtype=np.float32)
-        self.done_buf = np.zeros(size, dtype=np.float32)
+        self.rews_buf = np.zeros([size, 1], dtype=np.float32)
+        self.done_buf = np.zeros([size, 1], dtype=np.float32)
         self.ptr, self.size, self.max_size = 0, 0, size
 
     def store(self, obs, act, rew, next_obs, done):
@@ -60,11 +60,11 @@ class ReplayBuffer:
 
     def sample_batch(self, batch_size=32):
         idxs = np.random.randint(0, self.size, size=batch_size)
-        self.transitions.s = self.obs1_buf[idxs]
-        self.transitions.a = self.acts_buf[idxs]
-        self.transitions.r = self.rews_buf[idxs]
-        self.transitions.sp = self.obs2_buf[idxs]
-        self.transitions.it = self.done_buf[idxs]
+        self.transitions.s = tf.convert_to_tensor(self.obs1_buf[idxs])
+        self.transitions.a = tf.convert_to_tensor(self.acts_buf[idxs])
+        self.transitions.r = tf.convert_to_tensor(self.rews_buf[idxs])
+        self.transitions.sp = tf.convert_to_tensor(self.obs2_buf[idxs])
+        self.transitions.it = tf.convert_to_tensor(self.done_buf[idxs])
         return self.transitions
 
 
@@ -77,8 +77,5 @@ def update(target, source, rate):
         target (tf.Variable): Variable containing target information
         source (tf.Variable): Variable containing source information
     """
-    for target_param, param in zip(target.trainable_parameters, source.trainable_parameters):
+    for target_param, param in zip(target.trainable_variables, source.trainable_variables):
         target_param.assign(target_param * (1.0 - rate) + param * rate)
-
-
-
