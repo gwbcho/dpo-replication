@@ -113,7 +113,7 @@ def main():
         # check if game is terminated to decide how to update state, episode_steps, episode_rewards
         if is_terminal:
             state = env.reset()
-            results_dict['train_rewards'].apped((t, episode_rewards / episode_steps))
+            results_dict['train_rewards'].append((t, episode_rewards / episode_steps))
             episode_steps = 0
             episode_rewards = 0 
         else:
@@ -129,7 +129,7 @@ def main():
             
         # evaluate
         if t % args.eval_freq == 0:
-            results_dict['eval_rewards'].apped((t, evaluate_policy(gac, env, args.eval_episodes)))
+            results_dict['eval_rewards'].append((t, evaluate_policy(gac, env, args.eval_episodes)))
 
 if __name__ == '__main__':
     main()
