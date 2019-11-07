@@ -69,7 +69,7 @@ def evaluate_policy(policy, env, episodes):
     for _ in range(episodes):
         state = env.reset()
         while True:
-            action = policy.act(state)
+            action = policy.get_action(state)
             state, reward, is_terminal, _ = env.step(action)
             total_reward += reward
             if is_terminal:
@@ -90,7 +90,15 @@ def main():
     gac = GACAgent(args)
 
     state = env.reset()
-
+    
+    results_dict = {'train_rewards': []
+                    'eval_rewards': [],
+                    'actor_losses': [],
+                    'value_losses': [],
+                    'critic_losses': [],
+                    
+                    }
+    episode_steps, episode_rewards = 0, 0 # total steps and rewards for each episode
     """
     training loop
     """
@@ -101,11 +109,27 @@ def main():
         action = gac.get_action(tf.convert_to_tensor([state]))
         next_state, reward, is_terminal, _ = env.step(action)
         gac.store_transitions(state, action, reward, next_state, is_terminal)
-        state = env.reset() if is_terminal else next_state
-
+        
+        # check if game is terminated to decide how to update state, episode_steps, episode_rewards
+        if is_terminal:
+            state = env.reset()
+            results_dict['train_rewards'].append((t, episode_rewards / episode_steps))
+            episode_steps = 0
+            episode_rewards = 0 
+        else:
+            state = next_state
+            episode_steps += 1
+            episode_rewards += reward
+            
+        # train
         if gac.replay.size >= args.batch_size:
-            gac.train_one_step()
-
+            critic_history, value_history, actor_history = gac.train_one_step()
+            # I don't know how to use History objects....
+            # Somebody who knows please append the losses of critc, value and actor to results_dict
+            
+        # evaluate
+        if t % args.eval_freq == 0:
+            results_dict['eval_rewards'].append((t, evaluate_policy(gac, env, args.eval_episodes)))
 
 if __name__ == '__main__':
     main()
