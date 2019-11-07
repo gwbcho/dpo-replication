@@ -40,8 +40,7 @@ def create_argument_parser():
     parser.add_argument('--eval_episodes', type=int, default=10, metavar='N')
     parser.add_argument('--buffer_size', type=int, default=1000000, metavar='N',
             help='size of replay buffer (default: 1000000)')
-    parser.add_argument('--policy_type', default='ddpg', choices=['ddpg', 'generative'])
-    parser.add_argument('--num_outputs', type=int, default=1)
+    parser.add_argument('--action_samples', type=int, default=1)
     parser.add_argument('--visualize', default=False, action='store_true')
     parser.add_argument('--experiment_name', default=None, type=str,
             help='For multiple different experiments, provide an informative experiment name')
@@ -51,11 +50,9 @@ def create_argument_parser():
     parser.add_argument('--normalize_rewards', default=False, action='store_true', help='Normalize rewards')
     parser.add_argument('--q_normalization', type=float, default=0.01,
             help='Uniformly smooth the Q function in this range.')
-    parser.add_argument('--target_policy', type=str, default='linear', choices=['linear', 'max', 'boltzman', 'uniform'],
+    parser.add_argument('--mode', type=str, default='linear', choices=['linear', 'max', 'boltzman', 'uniform'],
             help='Target policy is constructed based on this operator.')
-    parser.add_argument('--target_policy_q', type=str, default='min', choices=['min', 'max', 'mean'],
-            help='The Q value for each sample is determined based on this operator over the two Q networks.')
-    parser.add_argument('--boltzman_temperature', type=float, default=1.0,
+    parser.add_argument('--beta', type=float, default=1.0,
             help='Boltzman Temperature for normalizing actions')
     return parser
 
