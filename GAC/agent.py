@@ -16,11 +16,10 @@ Class: Generative Actor Critic (GAC) agent.
 
 class GACAgent:
     """
-    GAC agent. 
+    GAC agent.
     Action is alway from -1 to 1 in each dimension.
     Will not do normalization.
     """
-
     def __init__(self, args):
 
         self.args = args
@@ -28,8 +27,8 @@ class GACAgent:
         if args.actor == 'IQN':
             self.actor = StochasticActor(args.state_dim,args.action_dim)
             self.target_actor = StochasticActor(args.state_dim,args.action_dim)
-            
-            
+
+
         elif args.actor == 'AIQN':
             self.actor = AutoRegressiveStochasticActor(args.state_dim,args.action_dim)
             self.target_actor = AutoRegressiveStochasticActor(args.state_dim,args.action_dim)
@@ -45,17 +44,15 @@ class GACAgent:
         update(self.target_critic, self.critic, 1.0)
         update(self.target_value, self.value, 1.0)
 
-        self.replay = ReplayBuffer(args.state_dim, args.action_dim, args.buffer_size) 
+        self.replay = ReplayBuffer(args.state_dim, args.action_dim, args.buffer_size)
         self.action_sampler = ActionSampler(self.actor.action_dim)
 
-
-    
     def train_one_step(self):
         """
         execute one update for each of the networks
         """
 
-        transitions = self.replay.sample_batch(self.args.batch_size) 
+        transitions = self.replay.sample_batch(self.args.batch_size)
         # transitions is sampled from replay buffer
         critic_history = self.critic.train(transitions, self.target_value, self.args.gamma)
         value_history = self.value.train(
@@ -65,16 +62,22 @@ class GACAgent:
                 self.target_critic,
                 self.args.action_samples
                 )
+        # TODO: tile (states) (batch_size * K, state_dim)
         states, actions, advantages = self._sample_positive_advantage_actions(transitions.s)
-        actor_history = self.actor.train(states, actions, advantages, self.args.mode, self.args.beta)
+        if advantages.shape[0]:
+            actor_history = self.actor.train(
+                states,
+                actions,
+                advantages,
+                self.args.mode,
+                self.args.beta
+            )
 
         update(self.target_actor, self.actor, self.args.soft_rate)
         update(self.target_critic, self.critic, self.args.soft_rate)
         update(self.target_value, self.value, self.args.soft_rate)
 
-
         return critic_history, value_history, actor_history
-
 
     def _sample_positive_advantage_actions(self, states):
         """
@@ -82,14 +85,17 @@ class GACAgent:
         Then only keep the actions with positive advantage.
         Returning one action per state, if more needed, make states contain the
         same state multiple times.
+
+        Args:
+            states (tf.Variable): dimension (batch_size * K, state_dim)
         """
 
         """ Sample actions """
         actions = self.action_sampler.get_actions(self.target_actor, states)
         actions = tf.concat([actions, tf.random.uniform(actions.shape, minval=-1.0, maxval=1.0)], 0)
         states = tf.concat([states, states], 0)
-        
-        """ compute Q and V """
+
+        """ compute Q and V dimensions (2 * batch_size * K, 1) """
         q = self.critic(states, actions)
         v = self.value(states)
 
@@ -99,11 +105,10 @@ class GACAgent:
         good_actions = tf.gather(actions, indices)
         advantages = tf.gather(q-v, indices)
 
-        return good_states, good_actions, advantages   
-
+        return good_states, good_actions, advantages
 
     def get_action(self, states):
-        return self.action_sampler.get_actions(self.actor, states) 
+        return self.action_sampler.get_actions(self.actor, states)
 
     def store_transitions(self, state, action, reward, next_state, is_done):
         self.replay.store(state, action, reward, next_state, is_done)

@@ -63,31 +63,13 @@ class CosineBasisLinear(tf.Module):
 
 class IQNActor(tf.Module):
     def __init__(self, state_dim, action_dim):
-        super(IQNActor, self).__init__()
         self.state_dim = state_dim
-        self.action_dim = action_dim 
+        self.action_dim = action_dim
         # we will use in the loss function.
 
         self.module_type = 'IQNActor'
         self.huber_loss_function = tf.keras.losses.Huber(delta=1.0)  # delta is kappa in paper
         self.optimizer = tf.keras.optimizers.Adam(0.0001)
-
-    def __call__(self, state, taus, supervise_actions=None):
-        """
-        Signature for all IQN related classes' __call__ functions. Note that actions is an optional
-        argument. This function is simply meant as a placeholder/stencil. It is not actually
-        necessary for this class.
-
-        Args:
-            state (tf.Variable): state vector containing a state with the format R^state_dim
-            taus (tf.Variable): randomly sampled noise vector for sampling purposes. This vector
-                should be of shape (batch_size x actor_dimension)
-            supervise_actions (tf.Variable): set of previous actions
-
-        Raise:
-            NotImplementedError (this is a template function)
-        """
-        raise NotImplementedError
 
     def target_density(self, mode, advantage, beta):
         """
@@ -117,7 +99,7 @@ class IQNActor(tf.Module):
             actions (tf.Tensor): (batch_size, action_dim), Quantile prediction from taus
             target_actions (tf.Tensor): (batch_size, action_dim)
             taus (tf.Variable): (batch_size, action_dim)
-            weights (tf.Variable): (batch_size, 1), The density of target action distribution D(a|s) 
+            weights (tf.Variable): (batch_size, 1), The density of target action distribution D(a|s)
 
         Returns:
             Huber quantile loss
@@ -126,7 +108,7 @@ class IQNActor(tf.Module):
         I_delta = tf.dtypes.cast(((actions - target_actions) > 0), tf.float32)
         eltwise_huber_loss = self.huber_loss_function(target_actions, actions)
         # delta is kappa in paper
-        eltwise_loss = tf.math.abs(taus - I_delta) * eltwise_huber_loss * weights 
+        eltwise_loss = tf.math.abs(taus - I_delta) * eltwise_huber_loss * weights
         #(batch_size, action_dim)
 
         return tf.math.reduce_mean(eltwise_loss) * self.action_dim
@@ -139,7 +121,7 @@ class IQNActor(tf.Module):
         supervise_actions: (batch_size, action_dim)
         advantage: (batch_size, 1)
         '''
-        
+
         taus = tf.random.uniform(tf.shape(supervise_actions))
         weights = self.target_density(mode, advantage, beta)
 
@@ -152,7 +134,7 @@ class IQNActor(tf.Module):
 
 
 
-class AutoRegressiveStochasticActor(IQNActor):
+class AutoRegressiveStochasticActor(IQNActor, tf.Module):
     def __init__(self, state_dim, action_dim, n_basis_functions = 64):
         """
         the autoregressive stochastic actor is an implicit quantile network used to sample from a
@@ -340,7 +322,7 @@ class Critic(tf.Module):
     the value of those states. The critic has two hidden layers and an output layer with size
     400, 300, and 1. All are fully connected layers.
 
-    Note that this is a black box critic which contains two networks. 
+    Note that this is a black box critic which contains two networks.
     And we will always output the smaller predictions.
     Double critic trick.
 
@@ -354,6 +336,8 @@ class Critic(tf.Module):
         self.action_dim = action_dim
         self.model1 = self._build_sequential_model(state_dim+action_dim)
         self.model2 = self._build_sequential_model(state_dim+action_dim)
+        self.trainable_variables = self.model1.trainable_variables \
+                                 + self.model2.trainable_variables
 
     def __call__(self, states, actions):
         x = tf.concat([states, actions], -1)
@@ -379,14 +363,14 @@ class Critic(tf.Module):
         """
         Line 10 of Algorithm 2
         """
-        Q = transitions.r + gamma * value(transitions.sp)
+        yQ = transitions.r + gamma * value(transitions.sp)
 
         """
         Line 11-12 of Algorithm 2
         """
         x = tf.concat([transitions.s, transitions.a], -1)
-        history1 = self.model1.fit(x, Q)
-        history2 = self.model2.fit(x, Q)
+        history1 = self.model1.fit(x, yQ)
+        history2 = self.model2.fit(x, yQ)
 
         return history1, history2
 
@@ -401,6 +385,7 @@ class Value(tf.Module):
         super(Value, self).__init__()
         self.model = self._build_sequential_model(state_dim)
         self.state_dim = state_dim
+        self.trainable_variables = self.model.trainable_variables
 
     def __call__(self, states):
         return self.model.predict(states)
@@ -423,13 +408,14 @@ class Value(tf.Module):
 
         """Each state needs action_samples action samples"""
 
-        #TODO: this tiling part is pretty dangerous. NEED DOUBLE CHECK!
-        # note from Greg: I think I've implemented a version of their tiling function
-        # please review it (_tile) to see if this is a more faithful version
+
 
         # originally, transitions.s is [batch_size , state_dim]
+
+        # we tiled in this way, so that after reshape we get back in the same order.
         states = tf.expand_dims(transitions.s, 1) # [batch_size , 1 , state_dim]
-        states = tf.broadcast_to(states, [states.shape[0], action_samples] + states.shape[2:])
+        # states = tf.broadcast_to(states, [states.shape[0], action_samples] + states.shape[2:])
+        states = tf.tile(states, [1, action_samples, 1])
         # [batch_size , action_samples , state dim]
         states = tf.reshape(states, [-1, self.state_dim])
         # [batch_size x action_samples , state dim]
@@ -439,8 +425,7 @@ class Value(tf.Module):
         Line 13 of Algorithm 2.
         Sample actions from the actor network given current state and tau ~ U[0,1].
         """
-        batch_size = transitions.s.shape[0]
-        taus = tf.random.uniform(shape=((batch_size, actor.action_dim)))
+        taus = tf.random.uniform(shape=((states.shape[0], actor.action_dim)))
         actions = actor(states, taus)
 
         """

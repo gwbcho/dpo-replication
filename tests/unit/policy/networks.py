@@ -2,7 +2,7 @@ import unittest
 
 import tensorflow as tf
 
-import policy.networks as networks
+import GAC.networks as networks
 
 
 class TestGacNetworks(unittest.TestCase):
