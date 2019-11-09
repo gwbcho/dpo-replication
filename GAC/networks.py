@@ -134,7 +134,7 @@ class IQNActor(tf.Module):
 
 
 
-class AutoRegressiveStochasticActor(IQNActor, tf.Module):
+class AutoRegressiveStochasticActor(IQNActor):
     def __init__(self, state_dim, action_dim, n_basis_functions = 64):
         """
         the autoregressive stochastic actor is an implicit quantile network used to sample from a
@@ -336,7 +336,7 @@ class Critic(tf.Module):
         self.action_dim = action_dim
         self.model1 = self._build_sequential_model(state_dim+action_dim)
         self.model2 = self._build_sequential_model(state_dim+action_dim)
-        
+
 
     def __call__(self, states, actions):
         x = tf.concat([states, actions], -1)
