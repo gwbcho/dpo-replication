@@ -129,9 +129,7 @@ class IQNActor(tf.Module):
             actions = self(states, taus, supervise_actions) #(batch_size, action_dim)
             loss = self.huber_quantile_loss(actions, supervise_actions, taus, weights)
         gradients = tape.gradient(loss, self.trainable_variables)
-        history = self.optimizer.apply_gradients(zip(gradients, self.trainable_variables))
-        return history
-
+        self.optimizer.apply_gradients(zip(gradients, self.trainable_variables))
 
 
 class AutoRegressiveStochasticActor(IQNActor):
@@ -337,7 +335,6 @@ class Critic(tf.Module):
         self.model1 = self._build_sequential_model(state_dim+action_dim)
         self.model2 = self._build_sequential_model(state_dim+action_dim)
 
-
     def __call__(self, states, actions):
         x = tf.concat([states, actions], -1)
         pred1 = self.model1.predict(x)
@@ -358,7 +355,6 @@ class Critic(tf.Module):
         transitions is of type named tuple policy.policy_helpers.helpers.Transition
         q1, q2 are seperate Q networks, thus can be trained separately
         """
-
         """
         Line 10 of Algorithm 2
         """
@@ -403,11 +399,6 @@ class Value(tf.Module):
         transitions is of type named tuple policy.policy_helpers.helpers.Transition
         action_sampler is of type policy.policy_helpers.helpers.ActionSampler
         """
-
-        """Each state needs action_samples action samples"""
-
-
-
         # originally, transitions.s is [batch_size , state_dim]
 
         # we tiled in this way, so that after reshape we get back in the same order.

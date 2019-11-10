@@ -21,14 +21,10 @@ class GACAgent:
     Will not do normalization.
     """
     def __init__(self, args):
-
         self.args = args
-
         if args.actor == 'IQN':
             self.actor = StochasticActor(args.state_dim,args.action_dim)
             self.target_actor = StochasticActor(args.state_dim,args.action_dim)
-
-
         elif args.actor == 'AIQN':
             self.actor = AutoRegressiveStochasticActor(args.state_dim,args.action_dim)
             self.target_actor = AutoRegressiveStochasticActor(args.state_dim,args.action_dim)
@@ -46,27 +42,27 @@ class GACAgent:
         update(self.target_value.model, self.value.model, 1.0)
 
         self.replay = ReplayBuffer(args.state_dim, args.action_dim, args.buffer_size)
-        self.action_sampler = ActionSampler(self.actor.action_dim)
+        self.action_sampler = ActionSampler(self.actor.action_dim)self.args = args
 
     def train_one_step(self):
         """
         execute one update for each of the networks
         """
-
+        # transitions is sampled from replay buffer
         transitions = self.replay.sample_batch(self.args.batch_size)
         # transitions is sampled from replay buffer
         critic_history = self.critics.train(transitions, self.target_value, self.args.gamma)
         value_history = self.value.train(
-                transitions,
-                # self.action_sampler # WE WILL DECIDE WHETHER WE NEED THIS LATER
-                self.target_actor,
-                self.target_critics,
-                self.args.action_samples
-                )
+            transitions,
+            # self.action_sampler # WE WILL DECIDE WHETHER WE NEED THIS LATER
+            self.target_actor,
+            self.target_critics,
+            self.args.action_samples
+        )
         # TODO: tile (states) (batch_size * K, state_dim)
         states, actions, advantages = self._sample_positive_advantage_actions(transitions.s)
         if advantages.shape[0]:
-            actor_history = self.actor.train(
+            self.actor.train(
                 states,
                 actions,
                 advantages,
@@ -79,7 +75,7 @@ class GACAgent:
         update(self.target_critics.model2, self.critics.model2, self.args.tau)
         update(self.target_value.model, self.value.model, self.args.tau)
 
-        return critic_history, value_history, actor_history
+        return critic_history, value_history
 
     def _sample_positive_advantage_actions(self, states):
         """
