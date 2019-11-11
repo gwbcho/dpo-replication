@@ -1,9 +1,9 @@
 import random
-import numpy as np
-from collections import namedtuple
 
+import numpy as np
 import tensorflow as tf
 
+from collections import namedtuple
 
 
 class ActionSampler():
