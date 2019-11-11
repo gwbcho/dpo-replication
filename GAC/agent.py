@@ -21,6 +21,14 @@ class GACAgent:
     Will not do normalization.
     """
     def __init__(self, args):
+        """
+        Agent class to generate a stochastic policy.
+
+        Args:
+            args (class):
+                Attributes:
+                    TODO
+        """
         self.args = args
         if args.actor == 'IQN':
             self.actor = StochasticActor(args.state_dim,args.action_dim)
@@ -46,7 +54,14 @@ class GACAgent:
 
     def train_one_step(self):
         """
-        execute one update for each of the networks
+        Execute one update for each of the networks. Note that if no positive advantage elements
+        are returned the algorithm doesn't update the actor parameters.
+
+        Args:
+            None
+
+        Returns:
+            None
         """
         # transitions is sampled from replay buffer
         transitions = self.replay.sample_batch(self.args.batch_size)
@@ -86,6 +101,11 @@ class GACAgent:
 
         Args:
             states (tf.Variable): dimension (batch_size * K, state_dim)
+
+        Returns:
+            good_states (list): Set of positive advantage states
+            good_actions (list): Set of positive advantage actions
+            advantages (list[float]): set of positive advantage values (Q - V)
         """
 
         """ Sample actions """
@@ -106,7 +126,30 @@ class GACAgent:
         return good_states, good_actions, advantages
 
     def get_action(self, states):
+        """
+        Get a set of actions for a batch of states
+
+        Args:
+            states (tf.Variable): dimensions (TODO)
+
+        Returns:
+            sampled actions for the given state with dimension (batch_size, action_dim)
+        """
         return self.action_sampler.get_actions(self.actor, states)
 
     def store_transitions(self, state, action, reward, next_state, is_done):
         self.replay.store(state, action, reward, next_state, is_done)
+
+    def _tile(self, a, dim, n_tile):
+        init_dim = a.shape[dim]
+        num_dims = len(a.shape)
+        repeat_idx = [1] * num_dims
+        repeat_idx[dim] = n_tile
+        tiled_results = tf.tile(a, repeat_idx)
+        order_index = tf.Variable(
+            np.concatenate(
+                [init_dim * np.arange(n_tile) + i for i in range(init_dim)]
+            ),
+            dtype=tf.int64
+        )
+        return tf.gather_nd(tiled_results, order_index, dim)

@@ -354,15 +354,20 @@ class Critic(tf.Module):
         """
         transitions is of type named tuple policy.policy_helpers.helpers.Transition
         q1, q2 are seperate Q networks, thus can be trained separately
-        """
-        """
-        Line 10 of Algorithm 2
-        """
-        yQ = transitions.r + gamma * value(transitions.sp)
 
+        Args:
+            TODO:
+            transitions
+            value
+            gamma
+
+        Returns:
+            critic history tuple (two histories for the two critic models in general)
         """
-        Line 11-12 of Algorithm 2
-        """
+
+        # Line 10 of Algorithm 2
+        yQ = transitions.r + gamma * value(transitions.sp)
+        # Line 11-12 of Algorithm 2
         x = tf.concat([transitions.s, transitions.a], -1)
         history1 = self.model1.fit(x, yQ)
         history2 = self.model2.fit(x, yQ)
@@ -398,7 +403,22 @@ class Value(tf.Module):
         """
         transitions is of type named tuple policy.policy_helpers.helpers.Transition
         action_sampler is of type policy.policy_helpers.helpers.ActionSampler
+
+        Args:
+            TODO: Fill this out
+            transitions
+            actor
+            critic
+            action_samples
+
+        Returns:
+            Value history element.
         """
+
+        """Each state needs action_samples action samples"""
+
+
+
         # originally, transitions.s is [batch_size , state_dim]
 
         # we tiled in this way, so that after reshape we get back in the same order.
