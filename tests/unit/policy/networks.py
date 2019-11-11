@@ -85,7 +85,6 @@ class TestGacNetworks(unittest.TestCase):
             )
         )
         action = actor(state, taus, prev_action)
-        print(action)
         self.assertEqual(action.shape[0], batch_size_1)
         self.assertEqual(action.shape[1], action_dim)
 
