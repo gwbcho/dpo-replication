@@ -336,8 +336,7 @@ class Critic(tf.Module):
         self.action_dim = action_dim
         self.model1 = self._build_sequential_model(state_dim+action_dim)
         self.model2 = self._build_sequential_model(state_dim+action_dim)
-        self.trainable_variables = self.model1.trainable_variables \
-                                 + self.model2.trainable_variables
+        
 
     def __call__(self, states, actions):
         x = tf.concat([states, actions], -1)
@@ -385,7 +384,6 @@ class Value(tf.Module):
         super(Value, self).__init__()
         self.model = self._build_sequential_model(state_dim)
         self.state_dim = state_dim
-        self.trainable_variables = self.model.trainable_variables
 
     def __call__(self, states):
         return self.model.predict(states)

@@ -74,8 +74,11 @@ def update(target, source, rate):
     update function.
     when tau = 1, then it's just assignment, i.e. hard update
     Args:
-        target (tf.Variable): Variable containing target information
-        source (tf.Variable): Variable containing source information
+        target (tf.Module): target model
+        source (tf.Module): source model
     """
-    for target_param, param in zip(target.trainable_variables, source.trainable_variables):
-        target_param.assign(target_param * (1.0 - rate) + param * rate)
+    target_params = target.trainable_variables
+    source_params = source.trainable_variables
+    for t, s in zip(target_params, source_params):
+        t.assign(t * (1.0 - rate) + s * rate)
+
