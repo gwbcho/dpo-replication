@@ -116,6 +116,7 @@ def main():
         next_state, reward, is_terminal, _ = env.step(action)
         gac.store_transitions(state, action, reward, next_state, is_terminal)
         average_rewards = average_rewards + ((reward - average_rewards)/count + 1)
+        count += 1
         print('average_rewards:', average_rewards)
 
         # check if game is terminated to decide how to update state, episode_steps, episode_rewards
