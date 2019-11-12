@@ -30,12 +30,14 @@ class GACAgent:
                     TODO
         """
         self.args = args
+        self.action_dim = args.action_dim
+        self.state_dim = args.state_dim
         if args.actor == 'IQN':
-            self.actor = StochasticActor(args.state_dim,args.action_dim)
-            self.target_actor = StochasticActor(args.state_dim,args.action_dim)
+            self.actor = StochasticActor(args.state_dim, args.action_dim)
+            self.target_actor = StochasticActor(args.state_dim, args.action_dim)
         elif args.actor == 'AIQN':
-            self.actor = AutoRegressiveStochasticActor(args.state_dim,args.action_dim)
-            self.target_actor = AutoRegressiveStochasticActor(args.state_dim,args.action_dim)
+            self.actor = AutoRegressiveStochasticActor(args.state_dim, args.action_dim)
+            self.target_actor = AutoRegressiveStochasticActor(args.state_dim, args.action_dim)
 
         self.critics = Critic(args.state_dim, args.action_dim)
         self.target_critics = Critic(args.state_dim, args.action_dim)
@@ -74,7 +76,6 @@ class GACAgent:
             self.target_critics,
             self.args.action_samples
         )
-        # TODO: tile (states) (batch_size * K, state_dim)
         states, actions, advantages = self._sample_positive_advantage_actions(transitions.s)
         if advantages.shape[0]:
             self.actor.train(
@@ -103,21 +104,20 @@ class GACAgent:
             states (tf.Variable): dimension (batch_size * K, state_dim)
 
         Returns:
-            good_states (list): Set of positive advantage states
+            good_states (list): Set of positive advantage states (batch_size, sate_dim)
             good_actions (list): Set of positive advantage actions
             advantages (list[float]): set of positive advantage values (Q - V)
         """
-
-        """ Sample actions """
+        # Sample actions
         actions = self.action_sampler.get_actions(self.target_actor, states)
         actions = tf.concat([actions, tf.random.uniform(actions.shape, minval=-1.0, maxval=1.0)], 0)
         states = tf.concat([states, states], 0)
 
-        """ compute Q and V dimensions (2 * batch_size * K, 1) """
-        q = self.critics(states, actions)
-        v = self.value(states)
+        # compute Q and V dimensions (2 * batch_size * K, 1)
+        q = tf.squeeze(self.critics(states, actions))
+        v = tf.squeeze(self.value(states))
 
-        """ select s, a with positive advantage """
+        # select s, a with positive advantage
         indices = tf.squeeze(tf.where(q > v))
         good_states = tf.gather(states, indices)
         good_actions = tf.gather(actions, indices)
@@ -138,18 +138,15 @@ class GACAgent:
         return self.action_sampler.get_actions(self.actor, states)
 
     def store_transitions(self, state, action, reward, next_state, is_done):
-        self.replay.store(state, action, reward, next_state, is_done)
+        """
+        Store the transition in the replay buffer.
 
-    def _tile(self, a, dim, n_tile):
-        init_dim = a.shape[dim]
-        num_dims = len(a.shape)
-        repeat_idx = [1] * num_dims
-        repeat_idx[dim] = n_tile
-        tiled_results = tf.tile(a, repeat_idx)
-        order_index = tf.Variable(
-            np.concatenate(
-                [init_dim * np.arange(n_tile) + i for i in range(init_dim)]
-            ),
-            dtype=tf.int64
-        )
-        return tf.gather_nd(tiled_results, order_index, dim)
+        Args:
+            # TODO
+            state
+            action
+            reward
+            next_state
+            is_done
+        """
+        self.replay.store(state, action, reward, next_state, is_done)
