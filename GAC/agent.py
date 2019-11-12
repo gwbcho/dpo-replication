@@ -118,7 +118,7 @@ class GACAgent:
         v = tf.squeeze(self.value(states))
 
         # select s, a with positive advantage
-        indices = tf.squeeze(tf.where(q > v))
+        indices = tf.where(q > v)
         good_states = tf.gather(states, indices)
         good_actions = tf.gather(actions, indices)
         advantages = tf.gather(q-v, indices)
