@@ -50,7 +50,7 @@ class GACAgent:
         update(self.target_value.model, self.value.model, 1.0)
 
         self.replay = ReplayBuffer(args.state_dim, args.action_dim, args.buffer_size)
-        self.action_sampler = ActionSampler(self.actor.action_dim)self.args = args
+        self.action_sampler = ActionSampler(self.actor.action_dim)
 
     def train_one_step(self):
         """

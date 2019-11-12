@@ -92,13 +92,13 @@ def main():
 
     state = env.reset()
 
-    results_dict = {'train_rewards': [],
-                    'eval_rewards': [],
-                    'actor_losses': [],
-                    'value_losses': [],
-                    'critic_losses': [],
-
-                    }
+    results_dict = {
+        'train_rewards': [],
+        'eval_rewards': [],
+        'actor_losses': [],
+        'value_losses': [],
+        'critic_losses': []
+    }
     episode_steps, episode_rewards = 0, 0 # total steps and rewards for each episode
     """
     training loop
