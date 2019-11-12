@@ -114,14 +114,16 @@ class GACAgent:
         states = tf.concat([states, states], 0)
 
         # compute Q and V dimensions (2 * batch_size * K, 1)
-        q = tf.squeeze(self.critics(states, actions))
-        v = tf.squeeze(self.value(states))
+        q = self.critics(states, actions)
+        v = self.value(states)
+        q_squeezed = tf.squeeze(q)
+        v_squeezed = tf.squeeze(v)
 
         # select s, a with positive advantage
-        indices = tf.where(q > v)
-        good_states = tf.gather(states, indices)
-        good_actions = tf.gather(actions, indices)
-        advantages = tf.gather(q-v, indices)
+        squeezed_indicies = tf.where(q_squeezed > v_squeezed)
+        good_states = tf.gather_nd(states, squeezed_indicies)
+        good_actions = tf.gather_nd(actions, squeezed_indicies)
+        advantages = tf.gather_nd(q-v, squeezed_indicies)
 
         return good_states, good_actions, advantages
 
