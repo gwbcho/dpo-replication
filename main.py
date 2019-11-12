@@ -103,6 +103,8 @@ def main():
     """
     training loop
     """
+    average_rewards = 0
+    count = 1
     for t in range(args.T):
         """
         Get an action from neural network and run it in the environment
@@ -113,6 +115,8 @@ def main():
         action = tf.squeeze(action, [0])
         next_state, reward, is_terminal, _ = env.step(action)
         gac.store_transitions(state, action, reward, next_state, is_terminal)
+        average_rewards = average_rewards + ((reward - average_rewards)/count + 1)
+        print('average_rewards:', average_rewards)
 
         # check if game is terminated to decide how to update state, episode_steps, episode_rewards
         if is_terminal:
@@ -125,6 +129,7 @@ def main():
             episode_steps += 1
             episode_rewards += reward
 
+        # TODO add rollout
         # train
         if gac.replay.size >= args.batch_size:
             gac.train_one_step()
