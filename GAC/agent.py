@@ -21,17 +21,23 @@ class GACAgent:
     Will not do normalization.
     """
     def __init__(self, args):
+        """
+        Agent class to generate a stochastic policy.
 
+        Args:
+            args (class):
+                Attributes:
+                    TODO
+        """
         self.args = args
-
+        self.action_dim = args.action_dim
+        self.state_dim = args.state_dim
         if args.actor == 'IQN':
-            self.actor = StochasticActor(args.state_dim,args.action_dim)
-            self.target_actor = StochasticActor(args.state_dim,args.action_dim)
-
-
+            self.actor = StochasticActor(args.state_dim, args.action_dim)
+            self.target_actor = StochasticActor(args.state_dim, args.action_dim)
         elif args.actor == 'AIQN':
-            self.actor = AutoRegressiveStochasticActor(args.state_dim,args.action_dim)
-            self.target_actor = AutoRegressiveStochasticActor(args.state_dim,args.action_dim)
+            self.actor = AutoRegressiveStochasticActor(args.state_dim, args.action_dim)
+            self.target_actor = AutoRegressiveStochasticActor(args.state_dim, args.action_dim)
 
         self.critics = Critic(args.state_dim, args.action_dim)
         self.target_critics = Critic(args.state_dim, args.action_dim)
@@ -50,23 +56,29 @@ class GACAgent:
 
     def train_one_step(self):
         """
-        execute one update for each of the networks
-        """
+        Execute one update for each of the networks. Note that if no positive advantage elements
+        are returned the algorithm doesn't update the actor parameters.
 
+        Args:
+            None
+
+        Returns:
+            None
+        """
+        # transitions is sampled from replay buffer
         transitions = self.replay.sample_batch(self.args.batch_size)
         # transitions is sampled from replay buffer
         critic_history = self.critics.train(transitions, self.target_value, self.args.gamma)
         value_history = self.value.train(
-                transitions,
-                # self.action_sampler # WE WILL DECIDE WHETHER WE NEED THIS LATER
-                self.target_actor,
-                self.target_critics,
-                self.args.action_samples
-                )
-        # TODO: tile (states) (batch_size * K, state_dim)
+            transitions,
+            # self.action_sampler # WE WILL DECIDE WHETHER WE NEED THIS LATER
+            self.target_actor,
+            self.target_critics,
+            self.args.action_samples
+        )
         states, actions, advantages = self._sample_positive_advantage_actions(transitions.s)
         if advantages.shape[0]:
-            actor_history = self.actor.train(
+            self.actor.train(
                 states,
                 actions,
                 advantages,
@@ -79,7 +91,7 @@ class GACAgent:
         update(self.target_critics.model2, self.critics.model2, self.args.tau)
         update(self.target_value.model, self.value.model, self.args.tau)
 
-        return critic_history, value_history, actor_history
+        return critic_history, value_history
 
     def _sample_positive_advantage_actions(self, states):
         """
@@ -90,27 +102,56 @@ class GACAgent:
 
         Args:
             states (tf.Variable): dimension (batch_size * K, state_dim)
-        """
 
-        """ Sample actions """
+        Returns:
+            good_states (list): Set of positive advantage states (batch_size, sate_dim)
+            good_actions (list): Set of positive advantage actions
+            advantages (list[float]): set of positive advantage values (Q - V)
+        """
+        # Sample actions
         actions = self.action_sampler.get_actions(self.target_actor, states)
         actions = tf.concat([actions, tf.random.uniform(actions.shape, minval=-1.0, maxval=1.0)], 0)
         states = tf.concat([states, states], 0)
 
-        """ compute Q and V dimensions (2 * batch_size * K, 1) """
+        # compute Q and V dimensions (2 * batch_size * K, 1)
         q = self.critics(states, actions)
         v = self.value(states)
+        # remove unused dimensions
+        q_squeezed = tf.squeeze(q)
+        v_squeezed = tf.squeeze(v)
 
-        """ select s, a with positive advantage """
-        indices = tf.squeeze(tf.where(q > v))
-        good_states = tf.gather(states, indices)
-        good_actions = tf.gather(actions, indices)
-        advantages = tf.gather(q-v, indices)
+        # select s, a with positive advantage
+        squeezed_indicies = tf.where(q_squeezed > v_squeezed)
+        # collect all advantegeous states and actions
+        good_states = tf.gather_nd(states, squeezed_indicies)
+        good_actions = tf.gather_nd(actions, squeezed_indicies)
+        # retrieve advantage values
+        advantages = tf.gather_nd(q-v, squeezed_indicies)
 
         return good_states, good_actions, advantages
 
     def get_action(self, states):
+        """
+        Get a set of actions for a batch of states
+
+        Args:
+            states (tf.Variable): dimensions (TODO)
+
+        Returns:
+            sampled actions for the given state with dimension (batch_size, action_dim)
+        """
         return self.action_sampler.get_actions(self.actor, states)
 
     def store_transitions(self, state, action, reward, next_state, is_done):
+        """
+        Store the transition in the replay buffer.
+
+        Args:
+            # TODO
+            state
+            action
+            reward
+            next_state
+            is_done
+        """
         self.replay.store(state, action, reward, next_state, is_done)
