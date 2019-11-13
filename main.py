@@ -109,7 +109,7 @@ def main():
         """
         Get an action from neural network and run it in the environment
         """
-        print('t = ', t)
+        print('t =', t)
         action = gac.get_action(tf.convert_to_tensor([state]))
         # remove the batch_size dimension if batch_size == 1
         action = tf.squeeze(action, [0])
@@ -138,7 +138,7 @@ def main():
         # evaluate
         if t % args.eval_freq == 0:
             eval_reward = evaluate_policy(gac, env, args.eval_episodes)
-            print('eval_reward: ', eval_reward)
+            print('eval_reward:', eval_reward)
             results_dict['eval_rewards'].append((t, eval_reward))
 
 if __name__ == '__main__':
