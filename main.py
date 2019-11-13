@@ -104,7 +104,7 @@ def main():
     training loop
     """
     average_rewards = 0
-    count = 1
+    count = 0
     for t in range(args.T):
         """
         Get an action from neural network and run it in the environment
