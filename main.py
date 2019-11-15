@@ -4,6 +4,7 @@ import argparse
 import gym
 import numpy as np
 import tensorflow as tf
+from tqdm import trange
 
 import utils
 from environment.normalized_actions import NormalizedActions
@@ -158,10 +159,8 @@ def main():
     average_rewards = 0
     count = 0
     total_steps = 0
-    for epoch in range(nb_epochs):
-        print('epoch:', epoch)
+    for epoch in trange(nb_epochs):
         for cycle in range(args.epoch_cycles):
-            print('cycle:', cycle)
             for rollout in range(args.rollout_steps):
                 """
                 Get an action from neural network and run it in the environment
