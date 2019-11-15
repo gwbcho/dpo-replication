@@ -369,8 +369,8 @@ class Critic(tf.Module):
         yQ = transitions.r + gamma * value(transitions.sp)
         # Line 11-12 of Algorithm 2
         x = tf.concat([transitions.s, transitions.a], -1)
-        history1 = self.model1.fit(x, yQ)
-        history2 = self.model2.fit(x, yQ)
+        history1 = self.model1.fit(x, yQ,verbose=0)
+        history2 = self.model2.fit(x, yQ,verbose=0)
 
         return history1, history2
 
@@ -453,5 +453,5 @@ class Value(tf.Module):
         Get value of current state from the Value network.
         Loss is MSE.
         """
-        history = self.model.fit(transitions.s, v_critic)
+        history = self.model.fit(transitions.s, v_critic, verbose=0)
         return history
