@@ -129,11 +129,7 @@ def main():
     args.action_dim = env.action_space.shape[0]
     args.state_dim = env.observation_space.shape[0]
 
-    base_dir = os.getcwd() + '/models/' + args.env_name + '/' + args.policy_type + '/'
-    if args.experiment_name is not None:
-        base_dir += args.experiment_name + '/'
-    if args.policy_type == 'ddpg':
-        base_dir += str(args.num_outputs) + '/'
+    base_dir = os.getcwd() + '/models/' + args.environment + '/'
     run_number = 0
     while os.path.exists(base_dir + str(run_number)):
         run_number += 1
