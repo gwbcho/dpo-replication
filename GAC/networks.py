@@ -2,7 +2,7 @@ import numpy as np
 import tensorflow as tf
 from tensorflow.keras import Sequential
 from tensorflow.keras.layers import Dense
-from GAC.helpers import FNN
+from GAC.helpers import FNN, ActionSampler
 
 """
 File Description:
@@ -67,11 +67,12 @@ class IQNActor(tf.Module):
         super(IQNActor, self).__init__()
         self.state_dim = state_dim
         self.action_dim = action_dim
-        # we will use in the loss function.
-
         self.module_type = 'IQNActor'
         self.huber_loss_function = tf.keras.losses.Huber(delta=1.0)  # delta is kappa in paper
         self.optimizer = tf.keras.optimizers.Adam(0.0001)
+    
+    def __call__(self):
+        raise NotImplementedError
 
     def _target_density(self, mode, advantage, beta):
         """
@@ -116,14 +117,59 @@ class IQNActor(tf.Module):
         return tf.math.reduce_mean(eltwise_loss) * self.action_dim
              # mean over batches, sum over action dimensions, according to Algorithm 2.
 
-    def train(self, states, supervise_actions, advantage, mode, beta):
+    def _sample_positive_advantage_actions(self, states, target_actor, target_critics, target_value):
+        """
+        Sample from the target network and a uniform distribution.
+        Then only keep the actions with positive advantage.
+        Returning one action per state, if more needed, make states contain the
+        same state multiple times.
+
+        Args:
+            states (tf.Variable): dimension (batch_size * K, state_dim)
+
+        Returns:
+            good_states (list): Set of positive advantage states (batch_size, sate_dim)
+            good_actions (list): Set of positive advantage actions
+            advantages (list[float]): set of positive advantage values (Q - V)
+        """
+        # Sample actions
+        actions = target_actor.get_action(states)
+        actions = tf.concat([actions, tf.random.uniform(actions.shape, minval=-1.0, maxval=1.0)], 0)
+        states = tf.concat([states, states], 0)
+
+        # compute Q and V dimensions (2 * batch_size * K, 1)
+        q = target_critics(states, actions)
+        v = target_value(states)
+        # remove unused dimensions
+        q_squeezed = tf.squeeze(q)
+        v_squeezed = tf.squeeze(v)
+
+        # select s, a with positive advantage
+        squeezed_indicies = tf.where(q_squeezed > v_squeezed)
+        # collect all advantegeous states and actions
+        good_states = tf.gather_nd(states, squeezed_indicies)
+        good_actions = tf.gather_nd(actions, squeezed_indicies)
+        # retrieve advantage values
+        advantages = tf.gather_nd(q-v, squeezed_indicies)
+
+        return good_states, good_actions, advantages
+
+    def get_action(self, states, supervise_actions = None):
+        batch_size = states.shape[0]
+        return self(states, 
+            tf.random.uniform((batch_size, self.action_dim), minval=0.0, maxval=1.0),
+            supervise_actions)
+
+    def train(self, transitions, target_actor, target_critics, target_value, mode, beta, action_samples):
         '''
         the batch_size here combines the state_batch_size and action samples.
         states: (batch_size,  state_dim)
         supervise_actions: (batch_size, action_dim)
         advantage: (batch_size, 1)
         '''
-
+        tiled_states = tf.tile(transitions.s, [action_samples,1])
+        states, supervise_actions, advantage = self._sample_positive_advantage_actions(
+                tiled_states, target_actor, target_critics, target_value)
         taus = tf.random.uniform(tf.shape(supervise_actions))
         weights = self._target_density(mode, advantage, beta)
 
