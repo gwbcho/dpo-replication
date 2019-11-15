@@ -87,6 +87,7 @@ class TestGacNetworks(unittest.TestCase):
         action = actor(state, taus, prev_action)
         self.assertEqual(action.shape[0], batch_size_1)
         self.assertEqual(action.shape[1], action_dim)
+        self.assertTrue(actor.trainable_variables)
 
     def test_stochastic_actor(self):
         batch_size_1 = 10
@@ -120,6 +121,7 @@ class TestGacNetworks(unittest.TestCase):
         action = actor(state, taus, prev_action)
         self.assertEqual(action.shape[0], batch_size_1)
         self.assertEqual(action.shape[1], action_dim)
+        self.assertTrue(actor.trainable_variables)
 
     def test_critic_network(self):
         batch_size_1 = 10
