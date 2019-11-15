@@ -3,7 +3,7 @@ import numpy as np
 import tensorflow as tf
 
 # import local dependencies
-from GAC.networks import StochasticActor, AutoRegressiveStochasticActor,  Critic, Value
+from GAC.networks import StochasticActor, AutoRegressiveStochasticActor, VanillaActor, Critic, Value
 from GAC.helpers import ReplayBuffer, update, ActionSampler
 
 
@@ -38,6 +38,12 @@ class GACAgent:
         elif args.actor == 'AIQN':
             self.actor = AutoRegressiveStochasticActor(args.state_dim, args.action_dim)
             self.target_actor = AutoRegressiveStochasticActor(args.state_dim, args.action_dim)
+        elif args.actor == 'Vanilla':
+            self.actor = VanillaActor(args.state_dim, args.action_dim)
+            self.target_actor = VanillaActor(args.state_dim, args.action_dim)
+        else:
+            raise NotImplementedError
+
 
         self.critics = Critic(args.state_dim, args.action_dim)
         self.target_critics = Critic(args.state_dim, args.action_dim)
@@ -68,8 +74,12 @@ class GACAgent:
         # transitions is sampled from replay buffer
         self.critics.train(transitions, self.target_value, self.args.gamma)
         self.value.train(transitions, self.target_actor, self.target_critics, self.args.action_samples)
-        self.actor.train(transitions, self.target_actor, self.target_critics, self.target_value, 
-                                    self.args.mode, self.args.beta, self.args.action_samples)
+        if self.args.actor in ['IQN', 'AIQN']:
+            self.actor.train(transitions, self.target_actor, self.target_critics, self.target_value, 
+                                    self.args.action_samples, self.args.mode, self.args.beta)
+        elif self.args.actor in ['Vanilla']:
+            self.actor.train(transitions, self.target_critics, self.args.action_samples)
+
 
         update(self.target_actor, self.actor, self.args.tau)
         update(self.target_critics, self.critics, self.args.tau)

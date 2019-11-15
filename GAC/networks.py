@@ -160,7 +160,7 @@ class IQNActor(tf.Module):
             tf.random.uniform((batch_size, self.action_dim), minval=0.0, maxval=1.0),
             supervise_actions)
 
-    def train(self, transitions, target_actor, target_critics, target_value, mode, beta, action_samples):
+    def train(self, transitions, target_actor, target_critics, target_value, action_samples, mode, beta):
         '''
         the batch_size here combines the state_batch_size and action samples.
         states: (batch_size,  state_dim)
@@ -361,6 +361,30 @@ class StochasticActor(IQNActor):
 
         return actions
 
+class VanillaActor(tf.Module):
+    def __init__(self, state_dim, action_dim):
+        super(VanillaActor, self).__init__()
+        self.state_dim = state_dim
+        self.action_dim = action_dim
+        self.fnn = FNN([state_dim, 400, 300, action_dim])
+        self.optimizer = tf.keras.optimizers.Adam(0.0001)
+
+    def __call__(self, states):
+        return tf.nn.tanh(self.fnn(states))
+
+    def get_action(self, states):
+        raw_action = self.fnn(states)
+        return tf.nn.tanh(raw_action + tf.random.normal(raw_action.shape, 0, 0.1))
+
+    def train(self, transitions, target_critics, action_samples):
+        tiled_states = tf.tile(transitions.s, [action_samples,1])
+        with tf.GradientTape() as tape:
+            actions = self.get_action(tiled_states)
+            loss = - target_critics(tiled_states, actions)
+        gradients = tape.gradient(loss, self.trainable_variables)
+        self.optimizer.apply_gradients(zip(gradients, self.trainable_variables))
+
+
 
 class Critic(tf.Module):
     '''
@@ -380,8 +404,8 @@ class Critic(tf.Module):
         super(Critic, self).__init__()
         self.state_dim = state_dim
         self.action_dim = action_dim
-        self.fnn1 = FNN([state_dim + action_dim, 400,300, 1])
-        self.fnn2 = FNN([state_dim + action_dim, 400,300, 1])
+        self.fnn1 = FNN([state_dim + action_dim, 400, 300, 1])
+        self.fnn2 = FNN([state_dim + action_dim, 400, 300, 1])
         self.optimizer1 = tf.keras.optimizers.Adam(0.0001)
         self.optimizer2 = tf.keras.optimizers.Adam(0.0001)
 
@@ -472,8 +496,8 @@ class Value(tf.Module):
         Line 13 of Algorithm 2.
         Sample actions from the actor network given current state and tau ~ U[0,1].
         """
-        taus = tf.random.uniform(shape=((states.shape[0], actor.action_dim)))
-        actions = actor(states, taus)
+        
+        actions = actor.get_action(states)
 
         """
         Line 14 of Algorithm 2.

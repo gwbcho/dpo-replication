@@ -47,7 +47,7 @@ def create_argument_parser():
     parser.add_argument('--experiment_name', default=None, type=str,
             help='For multiple different experiments, provide an informative experiment name')
     parser.add_argument('--print', default=False, action='store_true')
-    parser.add_argument('--actor', default='IQN', choices=['IQN', 'AIQN'])
+    parser.add_argument('--actor', default='IQN')
     parser.add_argument('--normalize_obs', default=False, action='store_true', help='Normalize observations')
     parser.add_argument('--normalize_rewards', default=False, action='store_true', help='Normalize rewards')
     parser.add_argument('--q_normalization', type=float, default=0.01,
