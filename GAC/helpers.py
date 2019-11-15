@@ -2,7 +2,7 @@ import random
 
 import numpy as np
 import tensorflow as tf
-
+from tensorflow.keras.layers import Dense
 from collections import namedtuple
 
 
@@ -82,3 +82,34 @@ def update(target, source, rate):
     for t, s in zip(target_params, source_params):
         t.assign(t * (1.0 - rate) + s * rate)
 
+
+class FNN(tf.Module):
+
+    def __init__(self, arch):
+        super(FNN, self).__init__()
+        self.layers = self._build_fnn_model(arch, activation=None)
+
+    def _build_fnn_model(self, arch, activation=None):
+        '''
+        arch: a list of integers discribing the width of each layer.
+        return: a list of layers.
+        '''
+        if activation is None:
+            activation = tf.keras.layers.LeakyReLU(alpha=0.01)
+
+        layers = []
+        for i in range(len(arch)-2):
+            layers.append(Dense(arch[i+1], activation=activation, input_shape = (arch[i],)))
+        layers.append(Dense(arch[-1], input_shape = (arch[-2],))) # the last layer don't need activation.
+
+        return layers
+
+    def __call__(self, x):
+        '''
+        layers: a list of layers
+        '''
+        length = len(self.layers)
+        out = x
+        for i in range(length):
+            out = self.layers[i](out)
+        return out

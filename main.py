@@ -42,7 +42,7 @@ def create_argument_parser():
     parser.add_argument('--eval_episodes', type=int, default=10, metavar='N')
     parser.add_argument('--buffer_size', type=int, default=1000000, metavar='N',
             help='size of replay buffer (default: 1000000)')
-    parser.add_argument('--action_samples', type=int, default=1)
+    parser.add_argument('--action_samples', type=int, default=16)
     parser.add_argument('--visualize', default=False, action='store_true')
     parser.add_argument('--experiment_name', default=None, type=str,
             help='For multiple different experiments, provide an informative experiment name')
@@ -107,27 +107,29 @@ def main():
     """
     average_rewards = 0
     count = 0
+    episode_count = 0
     for t in range(args.T):
         """
         Get an action from neural network and run it in the environment
         """
-        if t%10 == 0:
-            print('t =', t)
+        # if t%10 == 0:
+        #     print('t =', t)
         action = gac.get_action(tf.convert_to_tensor([state]))
         # remove the batch_size dimension if batch_size == 1
         action = tf.squeeze(action, [0]).numpy()
         next_state, reward, is_terminal, _ = env.step(action)
         # env.render()
         gac.store_transitions(state, action, reward, next_state, is_terminal)
-        average_rewards = average_rewards + ((reward - average_rewards)/(count + 1))
-        count += 1
+        # average_rewards = average_rewards + ((reward - average_rewards)/(count + 1))
+        # count += 1
         # print('average_rewards:', average_rewards)
 
         # check if game is terminated to decide how to update state, episode_steps, episode_rewards
         if is_terminal:
             state = env.reset()
+            episode_count += 1
             results_dict['train_rewards'].append((t, episode_rewards))
-            print('time: {} train eposide reward: {}'.format(t, episode_rewards))
+            print('training episode: {}, total interactions: {}, reward: {}'.format(episode_count, t, episode_rewards))
             episode_steps = 0
             episode_rewards = 0
         else:
