@@ -85,6 +85,8 @@ def main():
     Create Mujoco environment
     """
     env = gym.make(args.environment)
+    env_eval = gym.make(args.environment)
+
     args.action_dim = env.action_space.shape[0]
     args.state_dim = env.observation_space.shape[0]
 
@@ -137,7 +139,7 @@ def main():
 
         # evaluate
         if t % args.eval_freq == 0:
-            eval_reward = evaluate_policy(gac, env, args.eval_episodes)
+            eval_reward = evaluate_policy(gac, env_eval, args.eval_episodes)
             print('eval_reward:', eval_reward)
             results_dict['eval_rewards'].append((t, eval_reward))
 
