@@ -117,25 +117,24 @@ def main():
         action = gac.get_action(tf.convert_to_tensor([state]))
         # remove the batch_size dimension if batch_size == 1
         action = tf.squeeze(action, [0]).numpy()
+        # action = np.clip(action + np.random.normal(0,0.1,(args.action_dim)), -1, 1)
         next_state, reward, is_terminal, _ = env.step(action)
         # env.render()
         gac.store_transitions(state, action, reward, next_state, is_terminal)
         # average_rewards = average_rewards + ((reward - average_rewards)/(count + 1))
         # count += 1
         # print('average_rewards:', average_rewards)
-
-        # check if game is terminated to decide how to update state, episode_steps, episode_rewards
+        episode_count += 1
+        episode_rewards += reward
+        # check if game is terminated to decide how to update state
         if is_terminal:
             state = env.reset()
-            episode_count += 1
             results_dict['train_rewards'].append((t, episode_rewards))
             print('training episode: {}, total interactions: {}, reward: {}'.format(episode_count, t, episode_rewards))
             episode_steps = 0
             episode_rewards = 0
         else:
             state = next_state
-            episode_steps += 1
-            episode_rewards += reward
 
         # TODO add rollout
         # train
