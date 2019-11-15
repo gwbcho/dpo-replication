@@ -73,7 +73,7 @@ class IQNActor(tf.Module):
         self.huber_loss_function = tf.keras.losses.Huber(delta=1.0)  # delta is kappa in paper
         self.optimizer = tf.keras.optimizers.Adam(0.0001)
 
-    def target_density(self, mode, advantage, beta):
+    def _target_density(self, mode, advantage, beta):
         """
         The density of target policy D(a|s). Comes from table 1 in the paper.
 
@@ -91,7 +91,7 @@ class IQNActor(tf.Module):
         else:
             raise NotImplementedError
 
-    def huber_quantile_loss(self, actions, target_actions, taus, weights):
+    def _huber_quantile_loss(self, actions, target_actions, taus, weights):
         """
         Compute Huber losses for quantile regression.
 
@@ -125,11 +125,11 @@ class IQNActor(tf.Module):
         '''
 
         taus = tf.random.uniform(tf.shape(supervise_actions))
-        weights = self.target_density(mode, advantage, beta)
+        weights = self._target_density(mode, advantage, beta)
 
         with tf.GradientTape() as tape:
             actions = self(states, taus, supervise_actions) #(batch_size, action_dim)
-            loss = self.huber_quantile_loss(actions, supervise_actions, taus, weights)
+            loss = self._huber_quantile_loss(actions, supervise_actions, taus, weights)
         gradients = tape.gradient(loss, self.trainable_variables)
         self.optimizer.apply_gradients(zip(gradients, self.trainable_variables))
 
