@@ -2,7 +2,7 @@ import numpy as np
 import tensorflow as tf
 from tensorflow.keras import Sequential
 from tensorflow.keras.layers import Dense
-from GAC.helpers import build_fnn_model, forward_pass
+from GAC.helpers import FNN
 
 """
 File Description:
@@ -334,16 +334,16 @@ class Critic(tf.Module):
         super(Critic, self).__init__()
         self.state_dim = state_dim
         self.action_dim = action_dim
-        self.layers1 = build_fnn_model([state_dim + action_dim, 400,300, 1])
-        self.layers2 = build_fnn_model([state_dim + action_dim, 400,300, 1])
+        self.fnn1 = FNN([state_dim + action_dim, 400,300, 1])
+        self.fnn2 = FNN([state_dim + action_dim, 400,300, 1])
         self.optimizer1 = tf.keras.optimizers.Adam(0.0001)
         self.optimizer2 = tf.keras.optimizers.Adam(0.0001)
 
 
     def __call__(self, states, actions):
         x = tf.concat([states, actions], -1)
-        pred1 = forward_pass(self.layers1, x)
-        pred2 = forward_pass(self.layers2, x)
+        pred1 = self.fnn1(x)
+        pred2 = self.fnn2(x)
         return tf.minimum(pred1, pred2)
 
     def train(self, transitions, value, gamma):
@@ -365,15 +365,14 @@ class Critic(tf.Module):
         yQ = transitions.r + gamma * value(transitions.sp)
         # Line 11-12 of Algorithm 2
         x = tf.concat([transitions.s, transitions.a], -1)
-
         with tf.GradientTape() as tape1:
-            loss1 = tf.reduce_mean((forward_pass(self.layers1, x) - yQ)**2)
-        gradients1 = tape1.gradient(loss1, self.trainable_variables)
+            loss1 = tf.reduce_mean((self.fnn1(x) - yQ)**2)
+        gradients1 = tape1.gradient(loss1, self.fnn1.trainable_variables)
         self.optimizer1.apply_gradients(zip(gradients1, self.trainable_variables))
 
         with tf.GradientTape() as tape2:
-            loss2 = tf.reduce_mean((forward_pass(self.layers2, x) - yQ)**2)
-        gradients2 = tape2.gradient(loss2, self.trainable_variables)
+            loss2 = tf.reduce_mean((self.fnn2(x) - yQ)**2)
+        gradients2 = tape2.gradient(loss2, self.fnn2.trainable_variables)
         self.optimizer2.apply_gradients(zip(gradients2, self.trainable_variables))
 
 
@@ -386,11 +385,11 @@ class Value(tf.Module):
     def __init__(self, state_dim):
         super(Value, self).__init__()
         self.state_dim = state_dim
-        self.layers = build_fnn_model([state_dim, 400,300, 1])
+        self.fnn = FNN([state_dim, 400,300, 1])
         self.optimizer = tf.keras.optimizers.Adam(0.0001)
 
     def __call__(self, states):
-        return forward_pass(self.layers, states)
+        return self.fnn(states)
 
     def train(self, transitions, actor, critic, action_samples = 8):
         """
