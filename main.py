@@ -42,7 +42,7 @@ def create_argument_parser():
     parser.add_argument('--eval_episodes', type=int, default=10, metavar='N')
     parser.add_argument('--buffer_size', type=int, default=1000000, metavar='N',
             help='size of replay buffer (default: 1000000)')
-    parser.add_argument('--action_samples', type=int, default=1)
+    parser.add_argument('--action_samples', type=int, default=16)
     parser.add_argument('--visualize', default=False, action='store_true')
     parser.add_argument('--experiment_name', default=None, type=str,
             help='For multiple different experiments, provide an informative experiment name')

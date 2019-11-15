@@ -75,7 +75,8 @@ class GACAgent:
             self.target_critics,
             self.args.action_samples
         )
-        states, actions, advantages = self._sample_positive_advantage_actions(transitions.s)
+        tiled_states = tf.tile(transitions.s, [self.args.action_samples,1])
+        states, actions, advantages = self._sample_positive_advantage_actions(tiled_states)
         if advantages.shape[0]:
             self.actor.train(
                 states,
