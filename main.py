@@ -131,7 +131,8 @@ def main():
             state = env.reset()
             episode_count += 1
             results_dict['train_rewards'].append((t, episode_rewards))
-            print('training episode: {}, total interactions: {}, reward: {}'.format(episode_count, t, episode_rewards))
+            print('training episode: {}, current interactions: {}, total interactions: {}, reward: {}'
+                    .format(episode_count, episode_steps, t, episode_rewards))
             episode_steps = 0
             episode_rewards = 0
         else:
