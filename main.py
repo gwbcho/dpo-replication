@@ -124,10 +124,11 @@ def main():
         # average_rewards = average_rewards + ((reward - average_rewards)/(count + 1))
         # count += 1
         # print('average_rewards:', average_rewards)
-        episode_count += 1
+        
         episode_rewards += reward
         # check if game is terminated to decide how to update state
         if is_terminal:
+            episode_count += 1
             state = env.reset()
             results_dict['train_rewards'].append((t, episode_rewards))
             print('training episode: {}, total interactions: {}, reward: {}'.format(episode_count, t, episode_rewards))
