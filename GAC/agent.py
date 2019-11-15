@@ -113,8 +113,8 @@ class GACAgent:
         states = tf.concat([states, states], 0)
 
         # compute Q and V dimensions (2 * batch_size * K, 1)
-        q = self.critics(states, actions)
-        v = self.value(states)
+        q = self.target_critics(states, actions)
+        v = self.target_value(states)
         # remove unused dimensions
         q_squeezed = tf.squeeze(q)
         v_squeezed = tf.squeeze(v)
