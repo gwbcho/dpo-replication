@@ -373,7 +373,7 @@ class Critic(tf.Module):
 
         with tf.GradientTape() as tape2:
             loss2 = tf.reduce_mean((forward_pass(self.layers2, x) - yQ)**2)
-        gradients2 = tape1.gradient(loss2, self.trainable_variables)
+        gradients2 = tape2.gradient(loss2, self.trainable_variables)
         self.optimizer2.apply_gradients(zip(gradients2, self.trainable_variables))
 
 
