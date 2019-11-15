@@ -5,6 +5,7 @@ import gym
 import numpy as np
 import tensorflow as tf
 
+import utils
 from environment.normalized_actions import NormalizedActions
 from GAC.networks import AutoRegressiveStochasticActor as AIQN
 from GAC.networks import StochasticActor as IQN
@@ -128,10 +129,19 @@ def main():
     args.action_dim = env.action_space.shape[0]
     args.state_dim = env.observation_space.shape[0]
 
+    base_dir = os.getcwd() + '/models/' + args.env_name + '/' + args.policy_type + '/'
+    if args.experiment_name is not None:
+        base_dir += args.experiment_name + '/'
+    if args.policy_type == 'ddpg':
+        base_dir += str(args.num_outputs) + '/'
+    run_number = 0
+    while os.path.exists(base_dir + str(run_number)):
+        run_number += 1
+    base_dir = base_dir + str(run_number)
+    os.makedirs(base_dir)
+
     gac = GACAgent(args)
-
     state = env.reset()
-
     results_dict = {
         'train_rewards': [],
         'eval_rewards': [],
@@ -193,6 +203,8 @@ def main():
             if gac.replay.size >= args.batch_size:
                 for _ in range(args.T):
                     gac.train_one_step()
+
+    utils.save_model(gac.actor, base_dir)
 
 
 

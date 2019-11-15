@@ -4,7 +4,6 @@ import tensorflow as tf
 import numpy as np
 
 
-# TODO: update these to use tensorflow
 def save_model(actor, basedir=None):
     if not os.path.exists('models/'):
         os.makedirs('models/')
