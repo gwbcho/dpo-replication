@@ -2,7 +2,7 @@ import numpy as np
 import tensorflow as tf
 from tensorflow.keras import Sequential
 from tensorflow.keras.layers import Dense
-
+from GAC.helpers import build_fnn_model, forward_pass
 
 """
 File Description:
@@ -63,6 +63,8 @@ class CosineBasisLinear(tf.Module):
 
 class IQNActor(tf.Module):
     def __init__(self, state_dim, action_dim):
+
+        super(IQNActor, self).__init__()
         self.state_dim = state_dim
         self.action_dim = action_dim
         # we will use in the loss function.
@@ -332,23 +334,17 @@ class Critic(tf.Module):
         super(Critic, self).__init__()
         self.state_dim = state_dim
         self.action_dim = action_dim
-        self.model1 = self._build_sequential_model(state_dim+action_dim)
-        self.model2 = self._build_sequential_model(state_dim+action_dim)
+        self.layers1 = build_fnn_model([state_dim + action_dim, 400,300, 1])
+        self.layers2 = build_fnn_model([state_dim + action_dim, 400,300, 1])
+        self.optimizer1 = tf.keras.optimizers.Adam(0.0001)
+        self.optimizer2 = tf.keras.optimizers.Adam(0.0001)
+
 
     def __call__(self, states, actions):
         x = tf.concat([states, actions], -1)
-        pred1 = self.model1.predict(x)
-        pred2 = self.model2.predict(x)
+        pred1 = forward_pass(self.layers1, x)
+        pred2 = forward_pass(self.layers2, x)
         return tf.minimum(pred1, pred2)
-
-    def _build_sequential_model(self, input_dim):
-        # A helper function for building the graph
-        model = Sequential()
-        model.add(Dense(units=400, input_shape=(input_dim,), activation=tf.nn.leaky_relu))
-        model.add(Dense(units=300, activation=tf.nn.leaky_relu))
-        model.add(Dense(units=1))
-        model.compile(optimizer='adam', loss='mse')
-        return model
 
     def train(self, transitions, value, gamma):
         """
@@ -369,10 +365,16 @@ class Critic(tf.Module):
         yQ = transitions.r + gamma * value(transitions.sp)
         # Line 11-12 of Algorithm 2
         x = tf.concat([transitions.s, transitions.a], -1)
-        history1 = self.model1.fit(x, yQ,verbose=0)
-        history2 = self.model2.fit(x, yQ,verbose=0)
 
-        return history1, history2
+        with tf.GradientTape() as tape1:
+            loss1 = tf.reduce_mean((forward_pass(self.layers1, x) - yQ)**2)
+        gradients1 = tape1.gradient(loss1, self.trainable_variables)
+        self.optimizer1.apply_gradients(zip(gradients1, self.trainable_variables))
+
+        with tf.GradientTape() as tape2:
+            loss2 = tf.reduce_mean((forward_pass(self.layers2, x) - yQ)**2)
+        gradients2 = tape1.gradient(loss2, self.trainable_variables)
+        self.optimizer2.apply_gradients(zip(gradients2, self.trainable_variables))
 
 
 class Value(tf.Module):
@@ -383,21 +385,12 @@ class Value(tf.Module):
 
     def __init__(self, state_dim):
         super(Value, self).__init__()
-        self.model = self._build_sequential_model(state_dim)
         self.state_dim = state_dim
+        self.layers = build_fnn_model([state_dim, 400,300, 1])
+        self.optimizer = tf.keras.optimizers.Adam(0.0001)
 
     def __call__(self, states):
-        return self.model.predict(states)
-
-    def _build_sequential_model(self, input_dim):
-        # A helper function for building the graph
-        # model functions should be constructed separately to preserve modular design
-        model = Sequential()
-        model.add(Dense(units=400, input_shape=(input_dim,), activation=tf.nn.leaky_relu))
-        model.add(Dense(units=300, activation=tf.nn.leaky_relu))
-        model.add(Dense(units=1))
-        model.compile(optimizer='adam', loss='mse')
-        return model
+        return forward_pass(self.layers, states)
 
     def train(self, transitions, actor, critic, action_samples = 8):
         """
@@ -453,5 +446,20 @@ class Value(tf.Module):
         Get value of current state from the Value network.
         Loss is MSE.
         """
-        history = self.model.fit(transitions.s, v_critic, verbose=0)
-        return history
+
+        with tf.GradientTape() as tape:
+            loss = tf.reduce_mean((self(transitions.s) - v_critic)**2)
+        gradients = tape.gradient(loss, self.trainable_variables)
+        self.optimizer.apply_gradients(zip(gradients, self.trainable_variables))
+
+
+
+    # def _build_sequential_model(self, input_dim):
+    #     # A helper function for building the graph
+    #     # model functions should be constructed separately to preserve modular design
+    #     model = Sequential()
+    #     model.add(Dense(units=400, input_shape=(input_dim,), activation=tf.nn.leaky_relu))
+    #     model.add(Dense(units=300, activation=tf.nn.leaky_relu))
+    #     model.add(Dense(units=1))
+    #     model.compile(optimizer='adam', loss='mse')
+    #     return model

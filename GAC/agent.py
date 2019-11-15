@@ -47,9 +47,8 @@ class GACAgent:
 
         # initialize the target networks.
         update(self.target_actor, self.actor, 1.0)
-        update(self.target_critics.model1, self.critics.model1, 1.0)
-        update(self.target_critics.model2, self.critics.model2, 1.0)
-        update(self.target_value.model, self.value.model, 1.0)
+        update(self.target_critics, self.critics, 1.0)
+        update(self.target_value, self.value, 1.0)
 
         self.replay = ReplayBuffer(args.state_dim, args.action_dim, args.buffer_size)
         self.action_sampler = ActionSampler(self.actor.action_dim)
@@ -68,8 +67,8 @@ class GACAgent:
         # transitions is sampled from replay buffer
         transitions = self.replay.sample_batch(self.args.batch_size)
         # transitions is sampled from replay buffer
-        critic_history = self.critics.train(transitions, self.target_value, self.args.gamma)
-        value_history = self.value.train(
+        self.critics.train(transitions, self.target_value, self.args.gamma)
+        self.value.train(
             transitions,
             # self.action_sampler # WE WILL DECIDE WHETHER WE NEED THIS LATER
             self.target_actor,
@@ -87,11 +86,10 @@ class GACAgent:
             )
 
         update(self.target_actor, self.actor, self.args.tau)
-        update(self.target_critics.model1, self.critics.model1, self.args.tau)
-        update(self.target_critics.model2, self.critics.model2, self.args.tau)
-        update(self.target_value.model, self.value.model, self.args.tau)
+        update(self.target_critics, self.critics, self.args.tau)
+        update(self.target_value, self.value, self.args.tau)
 
-        return critic_history, value_history
+        
 
     def _sample_positive_advantage_actions(self, states):
         """
