@@ -72,18 +72,18 @@ class GACAgent:
         # transitions is sampled from replay buffer
         transitions = self.replay.sample_batch(self.args.batch_size)
         # transitions is sampled from replay buffer
-        self.critics.train(transitions, self.target_value, self.args.gamma)
-        self.value.train(transitions, self.target_actor, self.target_critics, self.args.action_samples)
+        self.critics.train(transitions, self.actor, self.target_value, self.target_critics, self.args.gamma)
+        # self.value.train(transitions, self.target_actor, self.target_critics, self.args.action_samples)
         if self.args.actor in ['IQN', 'AIQN']:
             self.actor.train(transitions, self.target_actor, self.target_critics, self.target_value, 
                                     self.args.action_samples, self.args.mode, self.args.beta)
         elif self.args.actor in ['Vanilla']:
-            self.actor.train(transitions, self.target_critics, self.args.action_samples)
+            self.actor.train(transitions, self.critics, self.args.action_samples)
 
 
-        update(self.target_actor, self.actor, self.args.tau)
+        # update(self.target_actor, self.actor, self.args.tau)
         update(self.target_critics, self.critics, self.args.tau)
-        update(self.target_value, self.value, self.args.tau)
+        # update(self.target_value, self.value, self.args.tau)
 
 
     def get_action(self, states):
