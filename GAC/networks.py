@@ -374,7 +374,7 @@ class VanillaActor(tf.Module):
 
     def get_action(self, states):
         raw_action = self.fnn(states)
-        return tf.nn.tanh(raw_action + tf.random.normal(raw_action.shape, 0, 0.1))
+        return tf.nn.tanh(raw_action + tf.random.normal(raw_action.shape, 0, 0.02))
 
     def train(self, transitions, target_critics, action_samples):
         tiled_states = tf.tile(transitions.s, [action_samples,1])
@@ -438,12 +438,12 @@ class Critic(tf.Module):
         with tf.GradientTape() as tape1:
             loss1 = tf.reduce_mean((self.fnn1(x) - yQ)**2)
         gradients1 = tape1.gradient(loss1, self.fnn1.trainable_variables)
-        self.optimizer1.apply_gradients(zip(gradients1, self.trainable_variables))
+        self.optimizer1.apply_gradients(zip(gradients1, self.fnn1.trainable_variables))
 
         with tf.GradientTape() as tape2:
             loss2 = tf.reduce_mean((self.fnn2(x) - yQ)**2)
         gradients2 = tape2.gradient(loss2, self.fnn2.trainable_variables)
-        self.optimizer2.apply_gradients(zip(gradients2, self.trainable_variables))
+        self.optimizer2.apply_gradients(zip(gradients2, self.fnn2.trainable_variables))
 
 
 class Value(tf.Module):

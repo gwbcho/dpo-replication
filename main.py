@@ -59,7 +59,7 @@ def create_argument_parser():
     return parser
 
 
-def evaluate_policy(policy, env, episodes):
+def evaluate_policy(actor, env, episodes):
     """
     Run the environment env using policy for episodes number of times.
     Return: average rewards per episode.
@@ -68,9 +68,11 @@ def evaluate_policy(policy, env, episodes):
     for _ in range(episodes):
         state = env.reset()
         while True:
-            action = policy.get_action(tf.convert_to_tensor([state]))
+            action = actor.get_action(tf.convert_to_tensor([state]))
             # remove the batch_size dimension if batch_size == 1
             action = tf.squeeze(action, [0]).numpy()
+            action = np.clip(action, -1, 1)
+
             state, reward, is_terminal, _ = env.step(action)
             total_reward += reward
             if is_terminal:
@@ -117,7 +119,7 @@ def main():
         action = gac.get_action(tf.convert_to_tensor([state]))
         # remove the batch_size dimension if batch_size == 1
         action = tf.squeeze(action, [0]).numpy()
-        # action = np.clip(action + np.random.normal(0,0.1,(args.action_dim)), -1, 1)
+        action = np.clip(action, -1, 1)
         next_state, reward, is_terminal, _ = env.step(action)
         # env.render()
         gac.store_transitions(state, action, reward, next_state, is_terminal)
