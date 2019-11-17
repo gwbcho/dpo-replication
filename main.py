@@ -118,7 +118,7 @@ def main():
         #     print('t =', t)
         action = gac.get_action(tf.convert_to_tensor([state]))
         # remove the batch_size dimension if batch_size == 1
-        action = tf.squeeze(action, [0]).numpy()
+        action = tf.squeeze(action, [0]).numpy() * 2.0
         action = np.clip(action, -1, 1)
         next_state, reward, is_terminal, _ = env.step(action)
         # env.render()
