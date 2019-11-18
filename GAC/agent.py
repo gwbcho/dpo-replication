@@ -27,7 +27,14 @@ class GACAgent:
         Args:
             args (class):
                 Attributes:
-                    TODO
+                    action_dim (int): action dimension
+                    state_dim (int): state dimension
+                    buffer_size (int): how much memory is allocated to the ReplayMemoryClass
+                    action_samples (int): originally labelled K in the paper, represents how many
+                        actions should be sampled from the memory buffer
+                    mode (string): poorly named variable to represent variable being used in the
+                        distribution being used
+                    beta (float): value used in blotzman distribution
         """
         self.args = args
         self.action_dim = args.action_dim
@@ -75,7 +82,7 @@ class GACAgent:
             self.target_critics,
             self.args.action_samples
         )
-        tiled_states = tf.tile(transitions.s, [self.args.action_samples,1])
+        tiled_states = tf.tile(transitions.s, [self.args.action_samples, 1])
         states, actions, advantages = self._sample_positive_advantage_actions(tiled_states)
         if advantages.shape[0]:
             self.actor.train(
@@ -85,12 +92,9 @@ class GACAgent:
                 self.args.mode,
                 self.args.beta
             )
-
         update(self.target_actor, self.actor, self.args.tau)
         update(self.target_critics, self.critics, self.args.tau)
         update(self.target_value, self.value, self.args.tau)
-
-        
 
     def _sample_positive_advantage_actions(self, states):
         """
@@ -111,14 +115,12 @@ class GACAgent:
         actions = self.action_sampler.get_actions(self.target_actor, states)
         actions = tf.concat([actions, tf.random.uniform(actions.shape, minval=-1.0, maxval=1.0)], 0)
         states = tf.concat([states, states], 0)
-
         # compute Q and V dimensions (2 * batch_size * K, 1)
         q = self.target_critics(states, actions)
         v = self.target_value(states)
         # remove unused dimensions
         q_squeezed = tf.squeeze(q)
         v_squeezed = tf.squeeze(v)
-
         # select s, a with positive advantage
         squeezed_indicies = tf.where(q_squeezed > v_squeezed)
         # collect all advantegeous states and actions
@@ -126,7 +128,6 @@ class GACAgent:
         good_actions = tf.gather_nd(actions, squeezed_indicies)
         # retrieve advantage values
         advantages = tf.gather_nd(q-v, squeezed_indicies)
-
         return good_states, good_actions, advantages
 
     def get_action(self, states):
@@ -146,11 +147,10 @@ class GACAgent:
         Store the transition in the replay buffer.
 
         Args:
-            # TODO
-            state
-            action
-            reward
-            next_state
-            is_done
+            state (tf.Variable): (batch_size, state_size) state vector
+            action (tf.Variable): (batch_size, action_size) action vector
+            reward (float): reward value determined by the environment
+            next_state (tf.Variable): (batch_size, state_size) next state vector
+            is_done (boolean): value to indicate that the state is terminal
         """
         self.replay.store(state, action, reward, next_state, is_done)

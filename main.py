@@ -110,7 +110,7 @@ def evaluate_policy(policy, env, episodes):
         state = env.reset()
         is_terminal = False
         while not is_terminal:
-            action = policy.get_action(tf.convert_to_tensor([state], dtype=tf.float64))
+            action = policy.get_action(tf.convert_to_tensor([state], dtype=tf.float32))
             # remove the batch_size dimension if batch_size == 1
             # action = tf.squeeze(action, [0])
             state, reward, is_terminal, _ = env.step(action[0])
