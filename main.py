@@ -120,6 +120,9 @@ def evaluate_policy(policy, env, episodes):
 
 
 def main():
+    print(tf.__version__)
+    print("GPU Available: ", tf.test.is_gpu_available())
+
     args = create_argument_parser().parse_args()
 
     """
