@@ -133,10 +133,24 @@ class SACAgent:
 
         self.replay = ReplayBuffer(args.state_dim, args.action_dim, args.buffer_size)
 
+
     def train_one_step(self):
+        if self.args.use_value:
+            self._train_one_step_use_value()
+        else:
+            self._train_one_step_no_value()
+
+
+    def _train_one_step_use_value(self):
+        transitions = self.replay.sample_batch(self.args.batch_size)
+        
+
+
+
+    def _train_one_step_no_value(self):
 
         transitions = self.replay.sample_batch(self.args.batch_size)
-        self.critics.train(transitions, self.actor, self.target_critics, self.args.gamma, self.log_alpha)
+        self.critics.train_no_value(transitions, self.actor, self.target_critics, self.args.gamma, self.log_alpha)
         self.actor.train(transitions, self.critics, 1, self.log_alpha)
         
         with tf.GradientTape() as tape:

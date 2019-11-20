@@ -29,6 +29,8 @@ def create_argument_parser():
             help='Target policy is constructed based on this operator. default="linear" ')
     parser.add_argument('--beta', type=float, default=1.0,
             help='Boltzman Temperature for normalizing actions, default=1.0')
+    parser.add_argument('--use_value', default=False, action='store_true',
+            help='if use value network for the training')
 
     parser.add_argument('--T', type=int, default=2000000, metavar='N',
             help='number of training steps (default: 2000000)')
@@ -36,6 +38,8 @@ def create_argument_parser():
     parser.add_argument('--eval_episodes', type=int, default=10, metavar='N')
     parser.add_argument('--norm_state', default=False, action='store_true',
             help='normalize the state to [-1,1]')
+    parser.add_argument('-vis', '--visualize', default=False, action='store_true',
+            help='if render the game')
 
     parser.add_argument('--model_path', type=str, default='/tmp/dpo/',
             help='trained model is saved to this location, default="/tmp/dpo/"')

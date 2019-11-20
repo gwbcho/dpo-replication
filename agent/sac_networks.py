@@ -72,7 +72,23 @@ class SACCritic(tf.Module):
         pred2 = self.fnn2(x)
         return tf.minimum(pred1, pred2)
 
-    def train(self, transitions, actor, target_critics, gamma, log_alpha):
+
+    def train_use_value(self, transitions, value, gamma, log_alpha):
+        yQ = transitions.r+gamma*(1-transitions.it)*value(transitions.sp)
+        x = tf.concat([transitions.s, transitions.a], -1)
+
+        with tf.GradientTape() as tape1:
+            loss1 = tf.reduce_mean((self.fnn1(x) - yQ)**2)
+        gradients1 = tape1.gradient(loss1, self.fnn1.trainable_variables)
+        self.optimizer1.apply_gradients(zip(gradients1, self.fnn1.trainable_variables))
+
+        with tf.GradientTape() as tape2:
+            loss2 = tf.reduce_mean((self.fnn2(x) - yQ)**2)
+        gradients2 = tape2.gradient(loss2, self.fnn2.trainable_variables)
+        self.optimizer2.apply_gradients(zip(gradients2, self.fnn2.trainable_variables))
+
+
+    def train_no_value(self, transitions, actor, target_critics, gamma, log_alpha):
         action, log_den = actor.get_action(transitions.sp, den = True)
         criticQ = target_critics(transitions.sp, action)
         yQ = transitions.r+gamma*(1-transitions.it)*(criticQ-tf.exp(log_alpha)*log_den)
