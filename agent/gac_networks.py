@@ -403,7 +403,7 @@ class Critic(tf.Module):
         """
 
         # Line 10 of Algorithm 2
-        yQ = transitions.r + gamma * value(transitions.sp)
+        yQ = transitions.r + gamma * (1-transitions.it) * value(transitions.sp)
         # Line 11-12 of Algorithm 2
         x = tf.concat([transitions.s, transitions.a], -1)
         with tf.GradientTape() as tape1:
