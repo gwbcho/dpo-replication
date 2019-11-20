@@ -154,7 +154,7 @@ class AutoRegressiveStochasticActor(IQNActor):
         self.module_type = 'AutoRegressiveStochasticActor'
         self.state_embedding = Dense(
             400,  # as specified by the architecture in the paper and in their code
-            activation=tf.nn.leaky_relu
+            activation=tf.keras.layers.LeakyReLU(alpha=0.01)
         )
         # use the cosine basis linear classes to "embed" the inputted values to a set dimension
         # this is equivalent to the psi function specified in the Actor diagram
@@ -164,7 +164,7 @@ class AutoRegressiveStochasticActor(IQNActor):
         # construct the GRU to ensure autoregressive qualities of our samples
         self.rnn = tf.keras.layers.GRU(400, return_state=True, return_sequences=True)
         # post processing linear layers
-        self.dense_layer_1 = Dense(400, activation=tf.nn.leaky_relu)
+        self.dense_layer_1 = Dense(400, activation=tf.keras.layers.LeakyReLU(alpha=0.01))
         # output layer (produces the sample from the implicit quantile function)
         # note the output is between [0, 1]
         self.dense_layer_2 = Dense(1, activation=tf.nn.tanh)
@@ -285,7 +285,7 @@ class StochasticActor(IQNActor):
 
         self.noise_embedding_layer = CosineBasisLinear(
             n_basis_functions, self.noise_embed_dim,
-            activation= tf.keras.layers.LeakyReLU(alpha=0.01))
+            activation=tf.keras.layers.LeakyReLU(alpha=0.01))
 
         self.merge_embedding_layer = Dense(
             200, activation= tf.keras.layers.LeakyReLU(alpha=0.01),

@@ -48,6 +48,7 @@ class ReplayBuffer:
         self.rews_buf = np.zeros([size, 1], dtype=np.float32)
         self.done_buf = np.zeros([size, 1], dtype=np.float32)
         self.ptr, self.size, self.max_size = 0, 0, size
+        self.size_list = range(self.size)
 
     def store(self, obs, act, rew, next_obs, done):
         self.obs1_buf[self.ptr] = obs
@@ -59,7 +60,7 @@ class ReplayBuffer:
         self.size = min(self.size+1, self.max_size)
 
     def sample_batch(self, batch_size=32):
-        idxs = np.random.randint(0, self.size, size=batch_size)
+        idxs = random.sample(self.size_list, batch_size)
         self.transitions.s = tf.convert_to_tensor(self.obs1_buf[idxs])
         self.transitions.a = tf.convert_to_tensor(self.acts_buf[idxs])
         self.transitions.r = tf.convert_to_tensor(self.rews_buf[idxs])
