@@ -32,6 +32,8 @@ class GACAgent:
         self.args = args
         self.action_dim = args.action_dim
         self.state_dim = args.state_dim
+        self.target_entropy = - args.action_dim
+
         if args.actor == 'IQN':
             self.actor = StochasticActor(args.state_dim, args.action_dim)
             self.target_actor = StochasticActor(args.state_dim, args.action_dim)
@@ -51,6 +53,8 @@ class GACAgent:
         self.value = Value(args.state_dim)
         self.target_value = Value(args.state_dim)
 
+        self.log_alpha = tf.Variable(0.0)
+        self.optimizer = tf.keras.optimizers.Adam(0.0001)
         # initialize the target networks.
         update(self.target_actor, self.actor, 1.0)
         update(self.target_critics, self.critics, 1.0)
@@ -72,14 +76,18 @@ class GACAgent:
         # transitions is sampled from replay buffer
         transitions = self.replay.sample_batch(self.args.batch_size)
         # transitions is sampled from replay buffer
-        self.critics.train(transitions, self.actor, self.target_value, self.target_critics, self.args.gamma)
+        self.critics.train(transitions, self.actor, self.target_critics, self.args.gamma, self.log_alpha)
         # self.value.train(transitions, self.target_actor, self.target_critics, self.args.action_samples)
         if self.args.actor in ['IQN', 'AIQN']:
             self.actor.train(transitions, self.target_actor, self.target_critics, self.target_value, 
                                     self.args.action_samples, self.args.mode, self.args.beta)
         elif self.args.actor in ['Vanilla']:
-            self.actor.train(transitions, self.critics, self.args.action_samples)
-
+            self.actor.train(transitions, self.critics, 1, self.log_alpha)
+            with tf.GradientTape() as tape:
+                _,log_den = self.actor.get_action(transitions.s,den = True)
+                alpha_loss = - tf.reduce_mean(self.log_alpha * tf.stop_gradient(log_den + self.target_entropy))
+            gradients = tape.gradient(alpha_loss, [self.log_alpha])
+            self.optimizer.apply_gradients(zip(gradients, [self.log_alpha]))
 
         # update(self.target_actor, self.actor, self.args.tau)
         update(self.target_critics, self.critics, self.args.tau)
