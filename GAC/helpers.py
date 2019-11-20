@@ -58,6 +58,7 @@ class ReplayBuffer:
         self.done_buf[self.ptr] = done
         self.ptr = (self.ptr+1) % self.max_size
         self.size = min(self.size+1, self.max_size)
+        self.size_list = range(self.size)
 
     def sample_batch(self, batch_size=32):
         idxs = random.sample(self.size_list, batch_size)
