@@ -33,7 +33,6 @@ class GACAgent:
         self.args = args
         self.action_dim = args.action_dim
         self.state_dim = args.state_dim
-        self.target_entropy = - args.action_dim # For SAC training
 
         if args.actor == 'IQN':
             self.actor = StochasticActor(args.state_dim, args.action_dim)
@@ -107,7 +106,6 @@ class SACAgent:
     """
     SAC agent.
     Action is alway from -1 to 1 in each dimension.
-    Will not do normalization.
     """
     def __init__(self, args):
 
