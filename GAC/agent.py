@@ -3,7 +3,7 @@ import numpy as np
 import tensorflow as tf
 
 # import local dependencies
-from GAC.networks import StochasticActor, AutoRegressiveStochasticActor, VanillaActor, Critic, Value
+from GAC.networks import StochasticActor, AutoRegressiveStochasticActor, SACActor, Critic, SACCritic, Value
 from GAC.helpers import ReplayBuffer, update, ActionSampler
 
 
@@ -32,7 +32,7 @@ class GACAgent:
         self.args = args
         self.action_dim = args.action_dim
         self.state_dim = args.state_dim
-        self.target_entropy = - args.action_dim
+        self.target_entropy = - args.action_dim # For SAC training
 
         if args.actor == 'IQN':
             self.actor = StochasticActor(args.state_dim, args.action_dim)
@@ -40,15 +40,22 @@ class GACAgent:
         elif args.actor == 'AIQN':
             self.actor = AutoRegressiveStochasticActor(args.state_dim, args.action_dim)
             self.target_actor = AutoRegressiveStochasticActor(args.state_dim, args.action_dim)
-        elif args.actor == 'Vanilla':
-            self.actor = VanillaActor(args.state_dim, args.action_dim)
-            self.target_actor = VanillaActor(args.state_dim, args.action_dim)
+        elif args.actor == 'SAC':
+            self.actor = SACActor(args.state_dim, args.action_dim)
+            self.target_actor = SACActor(args.state_dim, args.action_dim)
         else:
             raise NotImplementedError
 
+        if args.actor in ['IQN, AIQN']:
+            self.critics = Critic(args.state_dim, args.action_dim)
+            self.target_critics = Critic(args.state_dim, args.action_dim)
 
-        self.critics = Critic(args.state_dim, args.action_dim)
-        self.target_critics = Critic(args.state_dim, args.action_dim)
+        elif args.actor == 'SAC':
+            self.critics = SACCritic(args.state_dim, args.action_dim)
+            self.target_critics = SACCritic(args.state_dim, args.action_dim)
+        else:
+            raise NotImplementedError
+
 
         self.value = Value(args.state_dim)
         self.target_value = Value(args.state_dim)
