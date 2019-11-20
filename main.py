@@ -54,7 +54,7 @@ def evaluate_policy(actor, env, args):
         if args.norm_state:
             state = normalize(state, args.state_low, args.state_high)
         while True:
-            action = actor.get_action(tf.convert_to_tensor([state]))
+            action = actor.get_action(tf.convert_to_tensor([state], dtype = tf.float32))
             action = tf.squeeze(action, [0]).numpy()
             action = denormalize(action, args.action_low, args.action_high)
 
@@ -112,7 +112,7 @@ def main():
         Get an action from neural network and run it in the environment
         """
 
-        action = agent.get_action(tf.convert_to_tensor([state]))
+        action = agent.get_action(tf.convert_to_tensor([state], dtype = tf.float32))
         action = tf.squeeze(action, [0]).numpy() 
         action = denormalize(action, args.action_low, args.action_high)
 
