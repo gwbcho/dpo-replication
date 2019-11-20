@@ -12,7 +12,7 @@ from GAC.agent import GACAgent
 
 
 def create_argument_parser():
-    
+
     parser = argparse.ArgumentParser(
             description='An implementation of the Distributional Policy Optimization paper.')
     parser.add_argument('--environment', default="HalfCheetah-v2",
@@ -92,8 +92,6 @@ def main():
     """
     training loop
     """
-    average_rewards = 0
-    count = 0
     episode_count = 0
     for t in range(args.T):
         """
@@ -108,9 +106,6 @@ def main():
         if episode_count % 10 == 0 or episode_count > 100:
             env.render()
         gac.store_transitions(state, action, reward, next_state, is_terminal)
-        # average_rewards = average_rewards + ((reward - average_rewards)/(count + 1))
-        # count += 1
-        # print('average_rewards:', average_rewards)
         
         episode_rewards += reward
         # check if game is terminated to decide how to update state
@@ -126,7 +121,6 @@ def main():
             state = next_state
             episode_steps += 1
 
-        # TODO add rollout
         # train
         if gac.replay.size >= args.batch_size:
             gac.train_one_step()
