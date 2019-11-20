@@ -363,16 +363,25 @@ class StochasticActor(IQNActor):
 
 class Critic(tf.Module):
     '''
-    Critic for SAC
+    The Critic class create one or two critic networks, which take states as input and return
+    the value of those states. The critic has two hidden layers and an output layer with size
+    400, 300, and 1. All are fully connected layers.
+    Note that this is a black box critic which contains two networks.
+    And we will always output the smaller predictions.
+    Double critic trick.
+    Class Args:
+    state_dim (int): dim of states
+    action_dim (int): dim of actions
     '''
     def __init__(self, state_dim, action_dim):
         super(Critic, self).__init__()
         self.state_dim = state_dim
         self.action_dim = action_dim
-        self.fnn1 = FNN([state_dim + action_dim, 128, 128, 1])
-        self.fnn2 = FNN([state_dim + action_dim, 128, 128, 1])
+        self.fnn1 = FNN([state_dim + action_dim, 400,300, 1])
+        self.fnn2 = FNN([state_dim + action_dim, 400,300, 1])
         self.optimizer1 = tf.keras.optimizers.Adam(0.0001)
         self.optimizer2 = tf.keras.optimizers.Adam(0.0001)
+
 
     def __call__(self, states, actions):
         x = tf.concat([states, actions], -1)
@@ -380,21 +389,34 @@ class Critic(tf.Module):
         pred2 = self.fnn2(x)
         return tf.minimum(pred1, pred2)
 
-    def train(self, transitions, actor, target_critics, gamma, log_alpha):
-        action, log_den = actor.get_action(transitions.sp, den = True)
-        criticQ = target_critics(transitions.sp, action)
-        yQ = transitions.r+gamma*(1-transitions.it)*(criticQ-tf.exp(log_alpha)*log_den)
-        x = tf.concat([transitions.s, transitions.a], -1)
+    def train(self, transitions, value, gamma):
+        """
+        transitions is of type named tuple policy.policy_helpers.helpers.Transition
+        q1, q2 are seperate Q networks, thus can be trained separately
+        Args:
+            TODO:
+            transitions
+            value
+            gamma
+        Returns:
+            critic history tuple (two histories for the two critic models in general)
+        """
 
+        # Line 10 of Algorithm 2
+        yQ = transitions.r + gamma * value(transitions.sp)
+        # Line 11-12 of Algorithm 2
+        x = tf.concat([transitions.s, transitions.a], -1)
         with tf.GradientTape() as tape1:
             loss1 = tf.reduce_mean((self.fnn1(x) - yQ)**2)
         gradients1 = tape1.gradient(loss1, self.fnn1.trainable_variables)
-        self.optimizer1.apply_gradients(zip(gradients1, self.fnn1.trainable_variables))
+        self.optimizer1.apply_gradients(zip(gradients1, self.trainable_variables))
 
         with tf.GradientTape() as tape2:
             loss2 = tf.reduce_mean((self.fnn2(x) - yQ)**2)
         gradients2 = tape2.gradient(loss2, self.fnn2.trainable_variables)
-        self.optimizer2.apply_gradients(zip(gradients2, self.fnn2.trainable_variables))
+        self.optimizer2.apply_gradients(zip(gradients2, self.trainable_variables))
+
+
 
 class Value(tf.Module):
 
