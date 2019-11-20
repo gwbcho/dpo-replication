@@ -47,10 +47,9 @@ class GACAgent:
         else:
             raise NotImplementedError
 
-        if args.actor in ['IQN, AIQN']:
+        if args.actor in ['IQN', 'AIQN']:
             self.critics = Critic(args.state_dim, args.action_dim)
             self.target_critics = Critic(args.state_dim, args.action_dim)
-
         elif args.actor == 'SAC':
             self.critics = SACCritic(args.state_dim, args.action_dim)
             self.target_critics = SACCritic(args.state_dim, args.action_dim)
@@ -71,19 +70,18 @@ class GACAgent:
         self.replay = ReplayBuffer(args.state_dim, args.action_dim, args.buffer_size)
 
     def train_one_step(self):
-        """
-        Execute one update for each of the networks. Note that if no positive advantage elements
-        are returned the algorithm doesn't update the actor parameters.
-
-        Args:
-            None
-
-        Returns:
-            None
-        """
-
         if self.args.actor in ['AIQN', 'IQN']:
-            pass
+            # transitions is sampled from replay buffer
+            transitions = self.replay.sample_batch(self.args.batch_size)
+            self.critics.train(transitions, self.target_value, self.args.gamma)
+            self.value.train(transitions, self.target_actor, self.target_critics, self.args.action_samples)
+            self.actor.train(transitions, self.target_actor, self.target_critics, self.target_value, 
+                                        self.args.mode, self.args.beta, self.args.action_samples)
+
+            update(self.target_actor, self.actor, self.args.tau)
+            update(self.target_critics, self.critics, self.args.tau)
+            update(self.target_value, self.value, self.args.tau)
+
         elif self.args.actor == 'SAC':
             transitions = self.replay.sample_batch(self.args.batch_size)
             self.critics.train(transitions, self.actor, self.target_critics, self.args.gamma, self.log_alpha)
