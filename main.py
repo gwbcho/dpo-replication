@@ -12,6 +12,7 @@ from GAC.agent import GACAgent
 
 
 def create_argument_parser():
+    
     parser = argparse.ArgumentParser(
             description='An implementation of the Distributional Policy Optimization paper.')
     parser.add_argument('--environment', default="HalfCheetah-v2",
@@ -22,12 +23,6 @@ def create_argument_parser():
             help='discount factor for model (default: 0.005)')
     parser.add_argument('--batch_size', type=int, default=256, metavar='N',
             help='batch size (default: 64)')
-    parser.add_argument('--T', type=int, default=2000000, metavar='N',
-            help='number of training steps (default: 2000000)')
-    parser.add_argument('--model_path', type=str, default='/tmp/dpo/',
-            help='trained model is saved to this location, default="/tmp/dpo/"')
-    parser.add_argument('--eval_freq', type=int, default=5000, metavar='N')
-    parser.add_argument('--eval_episodes', type=int, default=10, metavar='N')
     parser.add_argument('--buffer_size', type=int, default=1000000, metavar='N',
             help='size of replay buffer (default: 1000000)')
     parser.add_argument('--action_samples', type=int, default=16)
@@ -36,6 +31,15 @@ def create_argument_parser():
             help='Target policy is constructed based on this operator. default="linear" ')
     parser.add_argument('--beta', type=float, default=1.0,
             help='Boltzman Temperature for normalizing actions, default=1.0')
+
+    parser.add_argument('--T', type=int, default=2000000, metavar='N',
+            help='number of training steps (default: 2000000)')
+    parser.add_argument('--eval_freq', type=int, default=5000, metavar='N')
+    parser.add_argument('--eval_episodes', type=int, default=10, metavar='N')
+
+
+    parser.add_argument('--model_path', type=str, default='/tmp/dpo/',
+            help='trained model is saved to this location, default="/tmp/dpo/"')
 
     return parser
 
