@@ -5,7 +5,7 @@ import gym
 import numpy as np
 import tensorflow as tf
 
-from GAC.agent import GACAgent
+from agent.agents import GACAgent
 
 from environment.rescale import normalize, denormalize
 

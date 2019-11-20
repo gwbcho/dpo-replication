@@ -2,7 +2,7 @@ import numpy as np
 import tensorflow as tf
 from tensorflow.keras import Sequential
 from tensorflow.keras.layers import Dense
-from GAC.helpers import FNN, ActionSampler
+from agent.helpers import FNN, ActionSampler
 
 """
 File Description:
