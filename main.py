@@ -124,7 +124,7 @@ def main():
         if args.norm_state:
             next_state = normalize(next_state, args.state_low, args.state_high)
 
-        if episode_count % 10 == 0 or episode_count > 100:
+        if (episode_count % 10 == 0 or episode_count > 100) and args.visualize:
             env.render()
         agent.store_transitions(state, action, reward, next_state, is_terminal)
         
