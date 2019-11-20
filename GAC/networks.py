@@ -159,18 +159,18 @@ class IQNActor(tf.Module):
             tf.random.uniform((batch_size, self.action_dim), minval=0.0, maxval=1.0),
             supervise_actions)
 
-    def train(self, transitions, target_actor, target_critics, target_value, action_samples, mode, beta):
+    def train(self, transitions, target_actor, target_critics, target_value, args):
         '''
         the batch_size here combines the state_batch_size and action samples.
         states: (batch_size,  state_dim)
         supervise_actions: (batch_size, action_dim)
         advantage: (batch_size, 1)
         '''
-        tiled_states = tf.tile(transitions.s, [action_samples,1])
+        tiled_states = tf.tile(transitions.s, [args.action_samples,1])
         states, supervise_actions, advantage = self._sample_positive_advantage_actions(
                 tiled_states, target_actor, target_critics, target_value)
         taus = tf.random.uniform(tf.shape(supervise_actions))
-        weights = self._target_density(mode, advantage, beta)
+        weights = self._target_density(args.mode, advantage, args.beta)
 
         with tf.GradientTape() as tape:
             actions = self(states, taus, supervise_actions) #(batch_size, action_dim)

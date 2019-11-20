@@ -75,8 +75,7 @@ class GACAgent:
             transitions = self.replay.sample_batch(self.args.batch_size)
             self.critics.train(transitions, self.target_value, self.args.gamma)
             self.value.train(transitions, self.target_actor, self.target_critics, self.args.action_samples)
-            self.actor.train(transitions, self.target_actor, self.target_critics, self.target_value, 
-                                        self.args.mode, self.args.beta, self.args.action_samples)
+            self.actor.train(transitions, self.target_actor, self.target_critics, self.target_value, self.args)
 
             update(self.target_actor, self.actor, self.args.tau)
             update(self.target_critics, self.critics, self.args.tau)
