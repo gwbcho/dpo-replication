@@ -80,25 +80,19 @@ class GACAgent:
         Returns:
             None
         """
-        # transitions is sampled from replay buffer
-        transitions = self.replay.sample_batch(self.args.batch_size)
-        # transitions is sampled from replay buffer
-        self.critics.train(transitions, self.actor, self.target_critics, self.args.gamma, self.log_alpha)
-        # self.value.train(transitions, self.target_actor, self.target_critics, self.args.action_samples)
-        if self.args.actor in ['IQN', 'AIQN']:
-            self.actor.train(transitions, self.target_actor, self.target_critics, self.target_value, 
-                                    self.args.action_samples, self.args.mode, self.args.beta)
-        elif self.args.actor in ['Vanilla']:
+
+        if self.args.actor == 'SAC':
+            transitions = self.replay.sample_batch(self.args.batch_size)
+            self.critics.train(transitions, self.actor, self.target_critics, self.args.gamma, self.log_alpha)
             self.actor.train(transitions, self.critics, 1, self.log_alpha)
+            
             with tf.GradientTape() as tape:
                 _,log_den = self.actor.get_action(transitions.s,den = True)
                 alpha_loss = - tf.reduce_mean(self.log_alpha * tf.stop_gradient(log_den + self.target_entropy))
             gradients = tape.gradient(alpha_loss, [self.log_alpha])
             self.optimizer.apply_gradients(zip(gradients, [self.log_alpha]))
 
-        # update(self.target_actor, self.actor, self.args.tau)
-        update(self.target_critics, self.critics, self.args.tau)
-        # update(self.target_value, self.value, self.args.tau)
+            update(self.target_critics, self.critics, self.args.tau)
 
 
     def get_action(self, states):

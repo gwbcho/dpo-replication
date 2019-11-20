@@ -20,7 +20,7 @@ def create_argument_parser():
     parser.add_argument('--tau', type=float, default=5e-3, metavar='G',
             help='discount factor for model (default: 0.005)')
     parser.add_argument('--batch_size', type=int, default=256, metavar='N',
-            help='batch size (default: 64)')
+            help='batch size (default: 256)')
     parser.add_argument('--buffer_size', type=int, default=1000000, metavar='N',
             help='size of replay buffer (default: 1000000)')
     parser.add_argument('--action_samples', type=int, default=16)
@@ -51,7 +51,8 @@ def evaluate_policy(actor, env, args):
     total_reward = 0.0
     for _ in range(args.eval_episodes):
         state = env.reset()
-        state = normalize(state, args.state_low, args.state_high)
+        if args.norm_state:
+            state = normalize(state, args.state_low, args.state_high)
         while True:
             action = actor.get_action(tf.convert_to_tensor([state]))
             action = tf.squeeze(action, [0]).numpy()

@@ -380,9 +380,9 @@ class SACActor(tf.Module):
         super(SACActor, self).__init__()
         self.state_dim = state_dim
         self.action_dim = action_dim
-        self.fnn = FNN([state_dim, 128, 128])
-        self.mean_layer = Dense(action_dim, input_shape = (128,))
-        self.std_layer = Dense(action_dim, input_shape = (128,))
+        self.fnn = FNN([state_dim, 256, 256])
+        self.mean_layer = Dense(action_dim, input_shape = (256,))
+        self.std_layer = Dense(action_dim, input_shape = (256,))
         self.optimizer = tf.keras.optimizers.Adam(0.0001)
 
     def get_action(self, states, den = False):
@@ -415,8 +415,8 @@ class SACCritic(tf.Module):
         super(SACCritic, self).__init__()
         self.state_dim = state_dim
         self.action_dim = action_dim
-        self.fnn1 = FNN([state_dim + action_dim, 128, 128, 1])
-        self.fnn2 = FNN([state_dim + action_dim, 128, 128, 1])
+        self.fnn1 = FNN([state_dim + action_dim, 256, 256, 1])
+        self.fnn2 = FNN([state_dim + action_dim, 256, 256, 1])
         self.optimizer1 = tf.keras.optimizers.Adam(0.0001)
         self.optimizer2 = tf.keras.optimizers.Adam(0.0001)
 
