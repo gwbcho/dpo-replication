@@ -5,11 +5,9 @@ import gym
 import numpy as np
 import tensorflow as tf
 
-from GAC.networks import AutoRegressiveStochasticActor as AIQN
-from GAC.networks import StochasticActor as IQN
-from GAC.networks import Critic, Value
 from GAC.agent import GACAgent
 
+from environment.rescale import normalize, denormalize
 
 def create_argument_parser():
 
@@ -44,25 +42,26 @@ def create_argument_parser():
     return parser
 
 
-def evaluate_policy(actor, env, episodes):
+def evaluate_policy(actor, env, args):
     """
     Run the environment env using policy for episodes number of times.
     Return: average rewards per episode.
     """
     total_reward = 0.0
-    for _ in range(episodes):
+    for _ in range(args.eval_episodes):
         state = env.reset()
+        state = normalize(state, args.state_low, args.state_high)
         while True:
             action = actor.get_action(tf.convert_to_tensor([state]))
-            # remove the batch_size dimension if batch_size == 1
             action = tf.squeeze(action, [0]).numpy()
-            action = np.clip(action, -1, 1)
+            action = denormalize(action, args.action_low, args.action_high)
 
             state, reward, is_terminal, _ = env.step(action)
+            state = normalize(state, args.state_low, args.state_high)
             total_reward += reward
             if is_terminal:
                 break
-    return total_reward / episodes
+    return total_reward / args.eval_episodes
 
 
 def main():
@@ -75,11 +74,17 @@ def main():
     env_eval = gym.make(args.environment)
 
     args.action_dim = env.action_space.shape[0]
+    args.action_low = env.action_space.low
+    args.action_high = env.action_space.high
+    
     args.state_dim = env.observation_space.shape[0]
+    args.state_low = env.observation_space.low
+    args.state_high = env.observation_space.high
 
     gac = GACAgent(args)
 
     state = env.reset()
+    state = normalize(state, args.state_low, args.state_high)
 
     results_dict = {
         'train_rewards': [],
@@ -97,12 +102,14 @@ def main():
         """
         Get an action from neural network and run it in the environment
         """
-        # if t%10 == 0:
-        #     print('t =', t)
+
         action = gac.get_action(tf.convert_to_tensor([state]))
         action = tf.squeeze(action, [0]).numpy() 
-        action = np.clip(action * 2, -2, 2)
+        action = denormalize(action, args.action_low, args.action_high)
+
         next_state, reward, is_terminal, _ = env.step(action)
+        next_state = normalize(next_state, args.state_low, args.state_high)
+
         if episode_count % 10 == 0 or episode_count > 100:
             env.render()
         gac.store_transitions(state, action, reward, next_state, is_terminal)
@@ -111,6 +118,7 @@ def main():
         # check if game is terminated to decide how to update state
         if is_terminal:
             state = env.reset()
+            state = normalize(state, args.state_low, args.state_high)
             episode_count += 1
             results_dict['train_rewards'].append((t, episode_rewards))
             print('training episode: {}, current interactions: {}, total interactions: {}, reward: {}'
@@ -127,7 +135,7 @@ def main():
 
         # evaluate
         if t % args.eval_freq == 0:
-            eval_reward = evaluate_policy(gac, env_eval, args.eval_episodes)
+            eval_reward = evaluate_policy(gac, env_eval, args)
             print('eval_reward:', eval_reward)
             results_dict['eval_rewards'].append((t, eval_reward))
 
