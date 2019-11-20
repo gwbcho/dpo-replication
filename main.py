@@ -34,7 +34,8 @@ def create_argument_parser():
             help='number of training steps (default: 2000000)')
     parser.add_argument('--eval_freq', type=int, default=5000, metavar='N')
     parser.add_argument('--eval_episodes', type=int, default=10, metavar='N')
-
+    parser.add_argument('--norm_state', default=False, action='store_true',
+            help='normalize the state to [-1,1]')
 
     parser.add_argument('--model_path', type=str, default='/tmp/dpo/',
             help='trained model is saved to this location, default="/tmp/dpo/"')
@@ -57,7 +58,8 @@ def evaluate_policy(actor, env, args):
             action = denormalize(action, args.action_low, args.action_high)
 
             state, reward, is_terminal, _ = env.step(action)
-            state = normalize(state, args.state_low, args.state_high)
+            if args.norm_state:
+                state = normalize(state, args.state_low, args.state_high)
             total_reward += reward
             if is_terminal:
                 break
@@ -84,7 +86,8 @@ def main():
     gac = GACAgent(args)
 
     state = env.reset()
-    state = normalize(state, args.state_low, args.state_high)
+    if args.norm_state:
+        state = normalize(state, args.state_low, args.state_high)
 
     results_dict = {
         'train_rewards': [],
@@ -108,7 +111,8 @@ def main():
         action = denormalize(action, args.action_low, args.action_high)
 
         next_state, reward, is_terminal, _ = env.step(action)
-        next_state = normalize(next_state, args.state_low, args.state_high)
+        if args.norm_state:
+            next_state = normalize(next_state, args.state_low, args.state_high)
 
         if episode_count % 10 == 0 or episode_count > 100:
             env.render()
@@ -118,7 +122,8 @@ def main():
         # check if game is terminated to decide how to update state
         if is_terminal:
             state = env.reset()
-            state = normalize(state, args.state_low, args.state_high)
+            if args.norm_state:
+                state = normalize(state, args.state_low, args.state_high)
             episode_count += 1
             results_dict['train_rewards'].append((t, episode_rewards))
             print('training episode: {}, current interactions: {}, total interactions: {}, reward: {}'
