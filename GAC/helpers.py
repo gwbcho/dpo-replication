@@ -6,7 +6,7 @@ from tensorflow.keras.layers import Dense
 from collections import namedtuple
 
 
-class ActionSampler():
+class ActionSampler:
     """
     Sampling actions from a given actor by feeding samples from a uniform distribution into the
     actor network.
