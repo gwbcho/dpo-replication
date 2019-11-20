@@ -5,7 +5,7 @@ import gym
 import numpy as np
 import tensorflow as tf
 
-from agent.agents import GACAgent
+from agent.agents import GACAgent, SACAgent
 
 from environment.rescale import normalize, denormalize
 
@@ -84,7 +84,12 @@ def main():
     args.state_low = env.observation_space.low
     args.state_high = env.observation_space.high
 
-    gac = GACAgent(args)
+    if args.actor in ['AIQN', 'IQN']:
+        agent = GACAgent(args)
+    elif args.actor == 'SAC':
+        agent = SACAgent(args)
+    else:
+        raise NotImplementedError
 
     state = env.reset()
     if args.norm_state:
@@ -107,7 +112,7 @@ def main():
         Get an action from neural network and run it in the environment
         """
 
-        action = gac.get_action(tf.convert_to_tensor([state]))
+        action = agent.get_action(tf.convert_to_tensor([state]))
         action = tf.squeeze(action, [0]).numpy() 
         action = denormalize(action, args.action_low, args.action_high)
 
@@ -117,7 +122,7 @@ def main():
 
         if episode_count % 10 == 0 or episode_count > 100:
             env.render()
-        gac.store_transitions(state, action, reward, next_state, is_terminal)
+        agent.store_transitions(state, action, reward, next_state, is_terminal)
         
         episode_rewards += reward
         # check if game is terminated to decide how to update state
@@ -136,12 +141,12 @@ def main():
             episode_steps += 1
 
         # train
-        if gac.replay.size >= args.batch_size:
-            gac.train_one_step()
+        if agent.replay.size >= args.batch_size:
+            agent.train_one_step()
 
         # evaluate
         if t % args.eval_freq == 0:
-            eval_reward = evaluate_policy(gac, env_eval, args)
+            eval_reward = evaluate_policy(agent, env_eval, args)
             print('eval_reward:', eval_reward)
             results_dict['eval_rewards'].append((t, eval_reward))
 
