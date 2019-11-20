@@ -81,18 +81,22 @@ class GACAgent:
             None
         """
 
-        if self.args.actor == 'SAC':
+        if self.args.actor in ['AIQN', 'IQN']:
+            pass
+        elif self.args.actor == 'SAC':
             transitions = self.replay.sample_batch(self.args.batch_size)
             self.critics.train(transitions, self.actor, self.target_critics, self.args.gamma, self.log_alpha)
             self.actor.train(transitions, self.critics, 1, self.log_alpha)
             
             with tf.GradientTape() as tape:
-                _,log_den = self.actor.get_action(transitions.s,den = True)
+                _, log_den = self.actor.get_action(transitions.s,den = True)
                 alpha_loss = - tf.reduce_mean(self.log_alpha * tf.stop_gradient(log_den + self.target_entropy))
             gradients = tape.gradient(alpha_loss, [self.log_alpha])
             self.optimizer.apply_gradients(zip(gradients, [self.log_alpha]))
 
             update(self.target_critics, self.critics, self.args.tau)
+        else:
+            raise NotImplementedError
 
 
     def get_action(self, states):
