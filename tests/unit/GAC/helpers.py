@@ -36,6 +36,10 @@ class TestHelpers(unittest.TestCase):
         batch = 2
         replay_buffer.store(state, action, reward, new_state, done)
         replay_buffer.store(state, action, reward, new_state, done)
+        replay_buffer.store(state, action, reward, new_state, done)
+        replay_buffer.store(state, action, reward, new_state, done)
+        replay_buffer.store(state, action, reward, new_state, done)
+        replay_buffer.store(state, action, reward, new_state, done)
         sample = replay_buffer.sample_batch(batch)
         self.assertEqual(sample.s[0, 0], state[0])
         self.assertEqual(sample.s[0, 1], state[1])
