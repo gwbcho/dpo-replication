@@ -3,7 +3,8 @@ import numpy as np
 import tensorflow as tf
 
 # import local dependencies
-from GAC.networks import StochasticActor, AutoRegressiveStochasticActor, SACActor, Critic, SACCritic, Value
+from GAC.networks import StochasticActor, AutoRegressiveStochasticActor, Critic, Value
+from GAC.sac_network import SACActor, SACCritic
 from GAC.helpers import ReplayBuffer, update, ActionSampler
 
 
