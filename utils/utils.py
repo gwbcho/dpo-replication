@@ -4,42 +4,22 @@ import tensorflow as tf
 import numpy as np
 
 
-# TODO: update these to use tensorflow
-def save_model(actor, obs_rms, rew_rms, basedir=None):
+def save_model(actor, basedir=None):
     if not os.path.exists('models/'):
         os.makedirs('models/')
 
     actor_path = "{}/ddpg_actor".format(basedir)
-    vars_path = "{}/ddpg_vars".format(basedir)
 
     # print('Saving models to {} {}'.format(actor_path, adversary_path))
-    torch.save(actor.state_dict(), actor_path)
-
-    var_dict = {'obs_rms_mean': None, 'obs_rms_var': None, 'rew_rms_mean': None, 'rew_rms_var': None}
-    if obs_rms is not None:
-        var_dict['obs_rms_mean'] = obs_rms.mean
-        var_dict['obs_rms_var'] = obs_rms.var
-    if rew_rms is not None:
-        var_dict['rew_rms_mean'] = rew_rms.mean
-        var_dict['rew_rms_var'] = rew_rms.var
-    torch.save(var_dict, vars_path)
+    tf.save_model.save(actor, actor_path)
 
 
-def load_model(agent, basedir=None):
+def load_model(basedir=None):
     actor_path = "{}/ddpg_actor".format(basedir)
-    vars_path = "{}/ddpg_vars".format(basedir)
 
     print('Loading model from {}'.format(actor_path))
-    agent.actor.load_state_dict(torch.load(actor_path))
-
-    var_dict = torch.load(vars_path)
-    if var_dict['obs_rms_mean'] is not None:
-        agent.obs_rms.mean = var_dict['obs_rms_mean']
-        agent.obs_rms.var = var_dict['obs_rms_var']
-        agent.normalize_observations = True
-    else:
-        agent.obs_rms = None
-        agent.normalize_observations = False
+    actor = tf.saved_model.load(actor_path)
+    return actor
 
 
 # Borrowed from openai baselines running_mean_std.py

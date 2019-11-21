@@ -1,8 +1,8 @@
 import numpy as np
 import tensorflow as tf
+
 from tensorflow.keras import Sequential
 from tensorflow.keras.layers import Dense
-from GAC.helpers import FNN
 
 """
 File Description:
@@ -63,7 +63,6 @@ class CosineBasisLinear(tf.Module):
 
 class IQNActor(tf.Module):
     def __init__(self, state_dim, action_dim):
-
         super(IQNActor, self).__init__()
         self.state_dim = state_dim
         self.action_dim = action_dim
@@ -113,16 +112,20 @@ class IQNActor(tf.Module):
         eltwise_loss = tf.math.abs(taus - I_delta) * eltwise_huber_loss * weights
         #(batch_size, action_dim)
 
+        # mean over batches, sum over action dimensions, according to Algorithm 2.
         return tf.math.reduce_mean(eltwise_loss) * self.action_dim
-             # mean over batches, sum over action dimensions, according to Algorithm 2.
 
     def train(self, states, supervise_actions, advantage, mode, beta):
-        '''
+        """
         the batch_size here combines the state_batch_size and action samples.
-        states: (batch_size,  state_dim)
-        supervise_actions: (batch_size, action_dim)
-        advantage: (batch_size, 1)
-        '''
+
+        Args:
+            states: (batch_size,  state_dim)
+            supervise_actions: (batch_size, action_dim)
+            advantage: (batch_size, 1)
+            mode (string): the type of distribution being used
+            beta (float): update rate for the Actor
+        """
 
         taus = tf.random.uniform(tf.shape(supervise_actions))
         weights = self.target_density(mode, advantage, beta)
@@ -151,7 +154,7 @@ class AutoRegressiveStochasticActor(IQNActor):
         self.module_type = 'AutoRegressiveStochasticActor'
         self.state_embedding = Dense(
             400,  # as specified by the architecture in the paper and in their code
-            activation=tf.nn.leaky_relu
+            activation=tf.keras.layers.LeakyReLU(alpha=0.01)
         )
         # use the cosine basis linear classes to "embed" the inputted values to a set dimension
         # this is equivalent to the psi function specified in the Actor diagram
@@ -161,7 +164,7 @@ class AutoRegressiveStochasticActor(IQNActor):
         # construct the GRU to ensure autoregressive qualities of our samples
         self.rnn = tf.keras.layers.GRU(400, return_state=True, return_sequences=True)
         # post processing linear layers
-        self.dense_layer_1 = Dense(400, activation=tf.nn.leaky_relu)
+        self.dense_layer_1 = Dense(400, activation=tf.keras.layers.LeakyReLU(alpha=0.01))
         # output layer (produces the sample from the implicit quantile function)
         # note the output is between [0, 1]
         self.dense_layer_2 = Dense(1, activation=tf.nn.tanh)
@@ -275,7 +278,6 @@ class StochasticActor(IQNActor):
         self.module_type = 'StochasticActor'
         self.noise_embed_dim = 400 // action_dim
 
-
         self.state_embedding_layer = Dense(
             self.noise_embed_dim * self.action_dim,
             activation=tf.keras.layers.LeakyReLU(alpha=0.01),
@@ -283,7 +285,7 @@ class StochasticActor(IQNActor):
 
         self.noise_embedding_layer = CosineBasisLinear(
             n_basis_functions, self.noise_embed_dim,
-            activation= tf.keras.layers.LeakyReLU(alpha=0.01))
+            activation=tf.keras.layers.LeakyReLU(alpha=0.01))
 
         self.merge_embedding_layer = Dense(
             200, activation= tf.keras.layers.LeakyReLU(alpha=0.01),
@@ -312,8 +314,39 @@ class StochasticActor(IQNActor):
         # (batch_size, self.noise_embed_dim * self.action_dim)
         merge_embedding = self.merge_embedding_layer(merge)  #(batch_size, 200)
         actions = self.output_action_layer(merge_embedding) # (batch_size, self.action_dim)
-
         return actions
+
+
+class FNN(tf.Module):
+
+    def __init__(self, arch):
+        super(FNN, self).__init__()
+        self.layers = self._build_fnn_model(arch, activation=None)
+
+    def _build_fnn_model(self, arch, activation=None):
+        '''
+        arch: a list of integers discribing the width of each layer.
+        return: a list of layers.
+        '''
+        if activation is None:
+            activation = tf.keras.layers.LeakyReLU(alpha=0.01)
+
+        layers = []
+        for i in range(len(arch)-2):
+            layers.append(Dense(arch[i+1], activation=activation, input_shape = (arch[i],)))
+        layers.append(Dense(arch[-1], input_shape = (arch[-2],))) # the last layer don't need activation.
+
+        return layers
+
+    def __call__(self, x):
+        '''
+        layers: a list of layers
+        '''
+        length = len(self.layers)
+        out = x
+        for i in range(length):
+            out = self.layers[i](out)
+        return out
 
 
 class Critic(tf.Module):
@@ -334,11 +367,10 @@ class Critic(tf.Module):
         super(Critic, self).__init__()
         self.state_dim = state_dim
         self.action_dim = action_dim
-        self.fnn1 = FNN([state_dim + action_dim, 400,300, 1])
-        self.fnn2 = FNN([state_dim + action_dim, 400,300, 1])
+        self.fnn1 = FNN([state_dim + action_dim, 400, 300, 1])
+        self.fnn2 = FNN([state_dim + action_dim, 400, 300, 1])
         self.optimizer1 = tf.keras.optimizers.Adam(0.0001)
         self.optimizer2 = tf.keras.optimizers.Adam(0.0001)
-
 
     def __call__(self, states, actions):
         x = tf.concat([states, actions], -1)
@@ -360,18 +392,17 @@ class Critic(tf.Module):
         Returns:
             critic history tuple (two histories for the two critic models in general)
         """
-
         # Line 10 of Algorithm 2
         yQ = transitions.r + gamma * value(transitions.sp)
         # Line 11-12 of Algorithm 2
         x = tf.concat([transitions.s, transitions.a], -1)
         with tf.GradientTape() as tape1:
-            loss1 = tf.reduce_mean((self.fnn1(x) - yQ)**2)
+            loss1 = tf.keras.losses.mse(yQ, self.fnn1(x))
         gradients1 = tape1.gradient(loss1, self.fnn1.trainable_variables)
         self.optimizer1.apply_gradients(zip(gradients1, self.fnn1.trainable_variables))
 
         with tf.GradientTape() as tape2:
-            loss2 = tf.reduce_mean((self.fnn2(x) - yQ)**2)
+            loss2 = tf.keras.losses.mse(yQ, self.fnn2(x))
         gradients2 = tape2.gradient(loss2, self.fnn2.trainable_variables)
         self.optimizer2.apply_gradients(zip(gradients2, self.fnn2.trainable_variables))
 
@@ -385,7 +416,7 @@ class Value(tf.Module):
     def __init__(self, state_dim):
         super(Value, self).__init__()
         self.state_dim = state_dim
-        self.fnn = FNN([state_dim, 400,300, 1])
+        self.fnn = FNN([state_dim, 400, 300, 1])
         self.optimizer = tf.keras.optimizers.Adam(0.0001)
 
     def __call__(self, states):
@@ -406,11 +437,7 @@ class Value(tf.Module):
         Returns:
             Value history element.
         """
-
-        """Each state needs action_samples action samples"""
-
-
-
+        # Each state needs action_samples action samples
         # originally, transitions.s is [batch_size , state_dim]
 
         # we tiled in this way, so that after reshape we get back in the same order.
@@ -420,7 +447,6 @@ class Value(tf.Module):
         # [batch_size , action_samples , state dim]
         states = tf.reshape(states, [-1, self.state_dim])
         # [batch_size x action_samples , state dim]
-
 
         """
         Line 13 of Algorithm 2.
@@ -445,20 +471,7 @@ class Value(tf.Module):
         Get value of current state from the Value network.
         Loss is MSE.
         """
-
         with tf.GradientTape() as tape:
-            loss = tf.reduce_mean((self(transitions.s) - v_critic)**2)
+            loss = tf.keras.losses.mse(v_critic, self(transitions.s))
         gradients = tape.gradient(loss, self.trainable_variables)
         self.optimizer.apply_gradients(zip(gradients, self.trainable_variables))
-
-
-
-    # def _build_sequential_model(self, input_dim):
-    #     # A helper function for building the graph
-    #     # model functions should be constructed separately to preserve modular design
-    #     model = Sequential()
-    #     model.add(Dense(units=400, input_shape=(input_dim,), activation=tf.nn.leaky_relu))
-    #     model.add(Dense(units=300, activation=tf.nn.leaky_relu))
-    #     model.add(Dense(units=1))
-    #     model.compile(optimizer='adam', loss='mse')
-    #     return model

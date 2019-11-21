@@ -6,7 +6,7 @@ from tensorflow.keras.layers import Dense
 from collections import namedtuple
 
 
-class ActionSampler():
+class ActionSampler:
     """
     Sampling actions from a given actor by feeding samples from a uniform distribution into the
     actor network.
@@ -48,6 +48,7 @@ class ReplayBuffer:
         self.rews_buf = np.zeros([size, 1], dtype=np.float32)
         self.done_buf = np.zeros([size, 1], dtype=np.float32)
         self.ptr, self.size, self.max_size = 0, 0, size
+        self.size_list = range(self.size)
 
     def store(self, obs, act, rew, next_obs, done):
         self.obs1_buf[self.ptr] = obs
@@ -56,17 +57,19 @@ class ReplayBuffer:
         self.rews_buf[self.ptr] = rew
         self.done_buf[self.ptr] = done
         self.ptr = (self.ptr+1) % self.max_size
+        prev_size = self.size
         self.size = min(self.size+1, self.max_size)
+        if prev_size < self.size:
+            self.size_list = range(self.size)
 
     def sample_batch(self, batch_size=32):
-        idxs = np.random.randint(0, self.size, size=batch_size)
+        idxs = random.sample(self.size_list, batch_size)
         self.transitions.s = tf.convert_to_tensor(self.obs1_buf[idxs])
         self.transitions.a = tf.convert_to_tensor(self.acts_buf[idxs])
         self.transitions.r = tf.convert_to_tensor(self.rews_buf[idxs])
         self.transitions.sp = tf.convert_to_tensor(self.obs2_buf[idxs])
         self.transitions.it = tf.convert_to_tensor(self.done_buf[idxs])
         return self.transitions
-
 
 
 def update(target, source, rate):
@@ -81,35 +84,3 @@ def update(target, source, rate):
     source_params = source.trainable_variables
     for t, s in zip(target_params, source_params):
         t.assign(t * (1.0 - rate) + s * rate)
-
-
-class FNN(tf.Module):
-
-    def __init__(self, arch):
-        super(FNN, self).__init__()
-        self.layers = self._build_fnn_model(arch, activation=None)
-
-    def _build_fnn_model(self, arch, activation=None):
-        '''
-        arch: a list of integers discribing the width of each layer.
-        return: a list of layers.
-        '''
-        if activation is None:
-            activation = tf.keras.layers.LeakyReLU(alpha=0.01)
-
-        layers = []
-        for i in range(len(arch)-2):
-            layers.append(Dense(arch[i+1], activation=activation, input_shape = (arch[i],)))
-        layers.append(Dense(arch[-1], input_shape = (arch[-2],))) # the last layer don't need activation.
-
-        return layers
-
-    def __call__(self, x):
-        '''
-        layers: a list of layers
-        '''
-        length = len(self.layers)
-        out = x
-        for i in range(length):
-            out = self.layers[i](out)
-        return out
