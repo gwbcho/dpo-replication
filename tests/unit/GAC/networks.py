@@ -38,6 +38,8 @@ class TestGacNetworks(unittest.TestCase):
             action_dim,
             n_basis_functions
         )
+        actor(tf.zeros((batch_size_1, num_inputs)), tf.zeros((batch_size_1, action_dim)))
+        self.assertTrue(actor.trainable_variables)
         # taus and actions are column vectors
         state = tf.Variable(
             tf.random.normal(
@@ -66,6 +68,8 @@ class TestGacNetworks(unittest.TestCase):
             action_dim,
             n_basis_functions
         )
+        actor(tf.zeros((batch_size_1, num_inputs)), tf.zeros((batch_size_1, action_dim)))
+        self.assertTrue(actor.trainable_variables)
         state = tf.Variable(
             tf.random.normal(
                 [batch_size_1, num_inputs],
@@ -100,6 +104,8 @@ class TestGacNetworks(unittest.TestCase):
             action_dim,
             n_basis_functions
         )
+        actor(tf.zeros((batch_size_1, num_inputs)), tf.zeros((batch_size_1, action_dim)))
+        self.assertTrue(actor.trainable_variables)
         state = tf.Variable(
             tf.random.normal(
                 [batch_size_1, num_inputs],

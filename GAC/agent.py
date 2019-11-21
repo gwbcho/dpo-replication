@@ -35,6 +35,7 @@ class GACAgent:
                     mode (string): poorly named variable to represent variable being used in the
                         distribution being used
                     beta (float): value used in blotzman distribution
+                    batch_size (int): batch size
         """
         self.args = args
         self.action_dim = args.action_dim
@@ -46,11 +47,35 @@ class GACAgent:
             self.actor = AutoRegressiveStochasticActor(args.state_dim, args.action_dim)
             self.target_actor = AutoRegressiveStochasticActor(args.state_dim, args.action_dim)
 
+        # initialize trainable variables
+        self.actor(
+            tf.zeros([args.batch_size, args.state_dim]),
+            tf.zeros([args.batch_size, args.action_dim])
+        )
+        self.target_actor(
+            tf.zeros([args.batch_size, args.state_dim]),
+            tf.zeros([args.batch_size, args.action_dim])
+        )
+
         self.critics = Critic(args.state_dim, args.action_dim)
         self.target_critics = Critic(args.state_dim, args.action_dim)
 
+        # initialize trainable variables for critics
+        self.critics(
+            tf.zeros([args.batch_size, args.state_dim]),
+            tf.zeros([args.batch_size, args.action_dim])
+        )
+        self.target_critics(
+            tf.zeros([args.batch_size, args.state_dim]),
+            tf.zeros([args.batch_size, args.action_dim])
+        )
+
         self.value = Value(args.state_dim)
         self.target_value = Value(args.state_dim)
+
+        # initialize value training variables
+        self.value(tf.zeros([args.batch_size, args.state_dim]))
+        self.value(tf.zeros([args.batch_size, args.state_dim]))
 
         # initialize the target networks.
         update(self.target_actor, self.actor, 1.0)
