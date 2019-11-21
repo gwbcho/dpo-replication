@@ -113,7 +113,7 @@ class IQNActor(tf.Module):
         #(batch_size, action_dim)
 
         # mean over batches, sum over action dimensions, according to Algorithm 2.
-        return tf.math.reduce_mean(eltwise_loss) * self.action_dim
+        return tf.math.reduce_mean(eltwise_loss)
 
     def train(self, states, supervise_actions, advantage, mode, beta):
         """
