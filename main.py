@@ -1,5 +1,6 @@
-import os
 import argparse
+import json
+import os
 
 import gym
 import numpy as np
@@ -194,7 +195,7 @@ def main():
                 if total_steps % args.eval_freq == 0:
                     eval_reward = evaluate_policy(gac, eval_env, args.eval_episodes)
                     print('eval_reward:', eval_reward)
-                    results_dict['eval_rewards'].append((total_steps, eval_reward))
+                    results_dict['eval_rewards'].append([total_steps, eval_reward])
 
                 total_steps += 1
 
@@ -202,6 +203,9 @@ def main():
             if gac.replay.size >= args.batch_size:
                 for _ in range(args.T):
                     gac.train_one_step()
+
+    with open('results.txt', 'w') as file:
+        file.write(json.dumps(results_dict))
 
     utils.save_model(gac.actor, base_dir)
 
