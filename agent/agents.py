@@ -4,7 +4,7 @@ import tensorflow as tf
 
 # import local dependencies
 from agent.gac_networks import StochasticActor, AutoRegressiveStochasticActor, Critic, Value
-from agent.sac_networks import SACActor, SACCritic
+from agent.sac_networks import SACActor, SACCritic, SACValue
 from agent.helpers import ReplayBuffer, update, ActionSampler
 
 
@@ -120,8 +120,8 @@ class SACAgent:
         self.critics = SACCritic(args.state_dim, args.action_dim)
         self.target_critics = SACCritic(args.state_dim, args.action_dim)
 
-        self.value = Value(args.state_dim)
-        self.target_value = Value(args.state_dim)
+        self.value = SACValue(args.state_dim)
+        self.target_value = SACValue(args.state_dim)
 
         self.log_alpha = tf.Variable(0.0)
         self.optimizer = tf.keras.optimizers.Adam(0.0001)
@@ -143,8 +143,18 @@ class SACAgent:
 
     def _train_one_step_use_value(self):
         transitions = self.replay.sample_batch(self.args.batch_size)
-        
+        self.critics.train_use_value(transitions, self.target_value, self.args.gamma)
+        self.value.train(transitions, self.actor, self.critics, 1, self.log_alpha)
+        self.actor.train(transitions, self.critics, 1, self.log_alpha)
 
+        with tf.GradientTape() as tape:
+            _, log_den = self.actor.get_action(transitions.s, den = True)
+            alpha_loss = - tf.reduce_mean(self.log_alpha * tf.stop_gradient(log_den + self.target_entropy))
+        gradients = tape.gradient(alpha_loss, [self.log_alpha])
+        self.optimizer.apply_gradients(zip(gradients, [self.log_alpha]))
+
+        update(self.target_value, self.value, self.args.tau)
+        
 
 
     def _train_one_step_no_value(self):

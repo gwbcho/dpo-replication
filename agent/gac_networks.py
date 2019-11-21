@@ -492,15 +492,3 @@ class Value(tf.Module):
             loss = tf.reduce_mean((self(transitions.s) - v_critic)**2)
         gradients = tape.gradient(loss, self.trainable_variables)
         self.optimizer.apply_gradients(zip(gradients, self.trainable_variables))
-
-
-
-    # def _build_sequential_model(self, input_dim):
-    #     # A helper function for building the graph
-    #     # model functions should be constructed separately to preserve modular design
-    #     model = Sequential()
-    #     model.add(Dense(units=400, input_shape=(input_dim,), activation=tf.nn.leaky_relu))
-    #     model.add(Dense(units=300, activation=tf.nn.leaky_relu))
-    #     model.add(Dense(units=1))
-    #     model.compile(optimizer='adam', loss='mse')
-    #     return model

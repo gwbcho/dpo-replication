@@ -17,7 +17,8 @@ def gaussian_log_den(x, mean, log_std):
 def squash(mean, action, log_den):
     new_mean = tf.tanh(mean) # actually mean is not tanh(mean)
     new_action = tf.tanh(action)
-    new_log_den = log_den - tf.reduce_sum(tf.math.log(tf.clip_by_value(1 - new_action**2, EPS, 1.0)), axis = 1, keepdims=True)
+    new_log_den = log_den - tf.reduce_sum(tf.math.log(tf.clip_by_value(1 - new_action**2, EPS, 1.0)), 
+                                        axis = 1, keepdims=True)
     return  new_mean, new_action, new_log_den
 
     
@@ -73,7 +74,7 @@ class SACCritic(tf.Module):
         return tf.minimum(pred1, pred2)
 
 
-    def train_use_value(self, transitions, value, gamma, log_alpha):
+    def train_use_value(self, transitions, value, gamma):
         yQ = transitions.r+gamma*(1-transitions.it)*value(transitions.sp)
         x = tf.concat([transitions.s, transitions.a], -1)
 
@@ -103,3 +104,32 @@ class SACCritic(tf.Module):
             loss2 = tf.reduce_mean((self.fnn2(x) - yQ)**2)
         gradients2 = tape2.gradient(loss2, self.fnn2.trainable_variables)
         self.optimizer2.apply_gradients(zip(gradients2, self.fnn2.trainable_variables))
+
+
+
+class SACValue(tf.Module):
+
+    """
+    Value network for SAC
+    """
+
+    def __init__(self, state_dim):
+        super(SACValue, self).__init__()
+        self.state_dim = state_dim
+        self.fnn = FNN([state_dim, 128, 128, 1])
+        self.optimizer = tf.keras.optimizers.Adam(0.0001)
+
+    def __call__(self, states):
+        return self.fnn(states)
+
+    def train(self, transitions, actor, critic, action_samples, log_alpha):
+        
+        tiled_states = tf.tile(transitions.s, [action_samples, 1])
+        actions, log_den = actor.get_action(tiled_states, den = True)
+
+        yV = critic(tiled_states, actions) - tf.exp(log_alpha) * log_den
+
+        with tf.GradientTape() as tape:
+            loss = tf.reduce_mean((self(tiled_states) - yV)**2)
+        gradients = tape.gradient(loss, self.trainable_variables)
+        self.optimizer.apply_gradients(zip(gradients, self.trainable_variables))
