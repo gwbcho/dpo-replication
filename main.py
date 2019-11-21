@@ -117,7 +117,7 @@ def evaluate_policy(policy, env, episodes):
             action = tf.squeeze(action, [0]).numpy()
             state, reward, is_terminal, _ = env.step(action)
             state, reward = np.float32(state), np.float32(reward)
-            rewards.append(reward)
+            rewards.append(float(reward))
             # env.render()
     return rewards
 
@@ -198,14 +198,10 @@ def main():
                 if total_steps % args.eval_freq == 0:
                     eval_rewards = evaluate_policy(gac, eval_env, args.eval_episodes)
                     eval_reward = sum(eval_rewards) / args.eval_episodes
-                    print('eval_reward:', eval_reward)
-
-                    results_dict['eval_rewards'].append((total_steps, eval_rewards))
+                    results_dict['eval_rewards'].append([total_steps, eval_rewards])
                     with open ('results.txt', 'w') as file:
                         file.write(json.dumps(results_dict))
-
                 total_steps += 1
-
             # train
             if gac.replay.size >= args.batch_size:
                 for _ in range(args.T):
