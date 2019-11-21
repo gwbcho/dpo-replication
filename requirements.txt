@@ -1,4 +1,0 @@
-numpy==1.16.1
-gym
-tqdm
-visdom
