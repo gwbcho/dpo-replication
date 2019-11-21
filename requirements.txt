@@ -5,4 +5,5 @@ visdom
 box2d-py
 Cython
 cffi
+lockfile
 mujoco-py

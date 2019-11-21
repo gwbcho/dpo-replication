@@ -35,6 +35,10 @@ The current requirements for this project are:
 - tqdm - for tracking experiment time left
 - visdom - for visualization of the learning process
 
+Note that there are other prerequisite requirements not stated here but are included in the requirements.txt file. To install all requirements you will need to run the following command from your CLI. Mujoco will, unfortunately, need to be installed by the user separately.
+
+    pip3 install -r requirements.txt.
+
 
 ## Docker commands
 
