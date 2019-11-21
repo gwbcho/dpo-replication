@@ -211,6 +211,8 @@ class AutoRegressiveStochasticActor(IQNActor):
         # note the output is between [0, 1]
         self.dense_layer_2 = Dense(1, activation=tf.nn.tanh)
 
+        self.get_action(tf.zeros([1,self.state_dim]))
+
     def __call__(self, state, taus, supervise_actions=None):
         """
         Analogous to the traditional call function in most models. This function conducts a single
@@ -338,6 +340,8 @@ class StochasticActor(IQNActor):
             self.action_dim, activation= tf.nn.tanh,
             input_shape = (200,))
 
+        self.get_action(tf.zeros([1,self.state_dim]))
+
     def __call__(self, states, taus, supervise_actions = None):
         """
         Args:
@@ -382,6 +386,7 @@ class Critic(tf.Module):
         self.optimizer1 = tf.keras.optimizers.Adam(0.0001)
         self.optimizer2 = tf.keras.optimizers.Adam(0.0001)
 
+        self(tf.zeros([1,self.state_dim]),tf.zeros([1, self.action_dim]))
 
     def __call__(self, states, actions):
         x = tf.concat([states, actions], -1)
@@ -429,6 +434,7 @@ class Value(tf.Module):
         self.state_dim = state_dim
         self.fnn = FNN([state_dim, 128, 128, 1])
         self.optimizer = tf.keras.optimizers.Adam(0.0001)
+        self(tf.zeros([1,self.state_dim]))
 
     def __call__(self, states):
         return self.fnn(states)

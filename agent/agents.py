@@ -50,10 +50,13 @@ class GACAgent:
 
         self.value = Value(args.state_dim)
         self.target_value = Value(args.state_dim)
-
-        self.log_alpha = tf.Variable(0.0)
         self.optimizer = tf.keras.optimizers.Adam(0.0001)
         # initialize the target networks.
+
+        print("trainable variables length", len(self.actor.trainable_variables),
+                                            len(self.critics.trainable_variables),
+                                            len(self.value.trainable_variables))
+
         update(self.target_actor, self.actor, 1.0)
         update(self.target_critics, self.critics, 1.0)
         update(self.target_value, self.value, 1.0)
@@ -126,6 +129,10 @@ class SACAgent:
         self.log_alpha = tf.Variable(0.0)
         self.optimizer = tf.keras.optimizers.Adam(0.0001)
 
+        print("trainable variables length", len(self.actor.trainable_variables),
+                                            len(self.critics.trainable_variables),
+                                            len(self.value.trainable_variables))
+                                    
         # initialize the target networks.
         update(self.target_actor, self.actor, 1.0)
         update(self.target_critics, self.critics, 1.0)

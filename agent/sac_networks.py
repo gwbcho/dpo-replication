@@ -32,6 +32,8 @@ class SACActor(tf.Module):
         self.std_layer = Dense(action_dim, input_shape = (256,))
         self.optimizer = tf.keras.optimizers.Adam(0.0001)
 
+        self.get_action(tf.zeros([1, self.state_dim]))
+
     def get_action(self, states, den = False):
         raw = self.fnn(states)
         mean = self.mean_layer(tf.nn.relu(raw))
@@ -66,6 +68,7 @@ class SACCritic(tf.Module):
         self.fnn2 = FNN([state_dim + action_dim, 256, 256, 1])
         self.optimizer1 = tf.keras.optimizers.Adam(0.0001)
         self.optimizer2 = tf.keras.optimizers.Adam(0.0001)
+        self(tf.zeros([1,self.state_dim]),tf.zeros([1, self.action_dim]))
 
     def __call__(self, states, actions):
         x = tf.concat([states, actions], -1)
@@ -118,12 +121,13 @@ class SACValue(tf.Module):
         self.state_dim = state_dim
         self.fnn = FNN([state_dim, 128, 128, 1])
         self.optimizer = tf.keras.optimizers.Adam(0.0001)
+        self(tf.zeros([1,self.state_dim]))
 
     def __call__(self, states):
         return self.fnn(states)
 
     def train(self, transitions, actor, critic, action_samples, log_alpha):
-        
+
         tiled_states = tf.tile(transitions.s, [action_samples, 1])
         actions, log_den = actor.get_action(tiled_states, den = True)
 

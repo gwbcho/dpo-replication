@@ -29,7 +29,7 @@ def create_argument_parser():
             help='Target policy is constructed based on this operator. default="linear" ')
     parser.add_argument('--beta', type=float, default=1.0,
             help='Boltzman Temperature for normalizing actions, default=1.0')
-    parser.add_argument('--use_value', default=False, action='store_true',
+    parser.add_argument('-value','--use_value', default=False, action='store_true',
             help='if use value network for the training')
 
     parser.add_argument('--T', type=int, default=2000000, metavar='N',
