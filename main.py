@@ -201,7 +201,7 @@ def main():
                     eval_variance = float(np.var(eval_rewards))
                     results_dict['eval_rewards'].append({
                         'total_steps': total_steps,
-                        'average_eval_reward': eval_rewards,
+                        'average_eval_reward': eval_reward,
                         'eval_reward_variance': eval_variance
                     })
                     with open ('results.txt', 'w') as file:
