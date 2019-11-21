@@ -387,7 +387,6 @@ class MyGenerativeActor(tf.Module):
 
         self.state_dim = state_dim
         self.action_dim = action_dim
-        self.module_type = 'MyGenerativeActor'
         self.optimizer = tf.keras.optimizers.Adam(0.0001)
 
         self.fnn = FNN([state_dim + action_dim, 128, 128, 1])
@@ -395,7 +394,7 @@ class MyGenerativeActor(tf.Module):
 
     def __call__(self, states, taus):
         x = tf.concat([states, taus], axis=-1)
-        return self.fnn(x)
+        return tf.tanh(self.fnn(x)+ taus * 3 - 1.5)
 
 
     def _eltwise_huber_loss(self, x, d=1):
