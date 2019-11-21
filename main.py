@@ -25,7 +25,7 @@ def create_argument_parser():
             help='size of replay buffer (default: 1000000)')
     parser.add_argument('--action_samples', type=int, default=16)
     parser.add_argument('--actor', default='IQN')
-    parser.add_argument('--mode', type=str, default='linear', choices=['linear', 'max', 'boltzman', 'uniform'],
+    parser.add_argument('--mode', type=str, default='linear', choices=['linear', 'max', 'boltzmann', 'uniform'],
             help='Target policy is constructed based on this operator. default="linear" ')
     parser.add_argument('--beta', type=float, default=1.0,
             help='Boltzman Temperature for normalizing actions, default=1.0')

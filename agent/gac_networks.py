@@ -387,7 +387,7 @@ class MyGenerativeActor(tf.Module):
 
         self.state_dim = state_dim
         self.action_dim = action_dim
-        self.module_type = 'IQNActor'
+        self.module_type = 'MyGenerativeActor'
         self.optimizer = tf.keras.optimizers.Adam(0.0001)
 
         self.fnn = FNN([state_dim + action_dim, 128, 128, 1])
@@ -408,7 +408,7 @@ class MyGenerativeActor(tf.Module):
     def _target_density(self, mode, advantage, beta):
         if mode == "linear":
             indicator = tf.cast(advantage>0, tf.float32)
-            return  indicator * advantage / tf.reduce_sum(advantage * indicator)
+            return indicator * advantage / (tf.reduce_sum(advantage * indicator) + 1e-4)
         elif mode == "boltzmann":
             return tf.nn.softmax(advantage/beta)
         else:
