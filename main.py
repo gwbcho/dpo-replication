@@ -5,6 +5,7 @@ import gym
 import numpy as np
 import tensorflow as tf
 from tqdm import trange
+import json
 
 import utils
 from environment.normalized_actions import NormalizedActions
@@ -105,7 +106,7 @@ def evaluate_policy(policy, env, episodes):
     Run the environment env using policy for episodes number of times.
     Return: average rewards per episode.
     """
-    total_reward = 0.0
+    rewards = []
     for _ in range(episodes):
         state = env.reset()
         is_terminal = False
@@ -114,9 +115,9 @@ def evaluate_policy(policy, env, episodes):
             # remove the batch_size dimension if batch_size == 1
             action = tf.squeeze(action, [0]).numpy()
             state, reward, is_terminal, _ = env.step(action)
-            total_reward += reward
+            rewards.append(reward)
             # env.render()
-    return total_reward / episodes
+    return rewards
 
 
 def main():
@@ -192,9 +193,12 @@ def main():
 
                 # evaluate
                 if total_steps % args.eval_freq == 0:
-                    eval_reward = evaluate_policy(gac, eval_env, args.eval_episodes)
+                    eval_rewards = evaluate_policy(gac, eval_env, args.eval_episodes)
+                    eval_reward = sum(eval_rewards) / args.eval_episodes
                     print('eval_reward:', eval_reward)
-                    results_dict['eval_rewards'].append((total_steps, eval_reward))
+                    results_dict['eval_rewards'].append((total_steps, eval_rewards))
+                    with open ('results.txt', 'w') as file:
+                        file.write(json.dumps(results_dict))
 
                 total_steps += 1
 
