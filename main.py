@@ -198,7 +198,7 @@ def main():
                 if total_steps % args.eval_freq == 0:
                     eval_rewards = evaluate_policy(gac, eval_env, args.eval_episodes)
                     eval_reward = sum(eval_rewards) / args.eval_episodes
-                    eval_variance = float(numpy.var(eval_rewards))
+                    eval_variance = float(np.var(eval_rewards))
                     results_dict['eval_rewards'].append({
                         'total_steps': total_steps,
                         'average_eval_reward': eval_rewards,
