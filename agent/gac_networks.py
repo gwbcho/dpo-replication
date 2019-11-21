@@ -409,8 +409,8 @@ class MyGenerativeActor(tf.Module):
         advantage in shape: [state_batch_size, action_samples, 1]
         '''
         if mode == "linear":
-            ind_adv = tf.cast(advantage>0, tf.float32) * advantage + 1e-6
-            return  ind_adv/tf.reduce_sum(ind_adv, axis = 1, keepdims = True)
+            ind_adv = tf.cast(advantage>0, tf.float32) * advantage
+            return  ind_adv/(1e-6 + tf.reduce_sum(ind_adv, axis = 1, keepdims = True))
         elif mode == "boltzmann":
             exp_adv = tf.exp(advantage)
             return  exp_adv/tf.reduce_sum(exp_adv, axis = 1, keepdims = True)
