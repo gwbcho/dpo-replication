@@ -3,3 +3,6 @@ gym
 tqdm
 visdom
 box2d-py
+Cython
+cffi
+mujoco-py
