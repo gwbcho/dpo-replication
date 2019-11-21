@@ -69,7 +69,10 @@ class IQNActor(tf.Module):
         # we will use in the loss function.
 
         self.module_type = 'IQNActor'
-        self.huber_loss_function = tf.keras.losses.Huber(delta=1.0)  # delta is kappa in paper
+        self.huber_loss_function = tf.keras.losses.Huber(
+            delta=1.0,
+            reduction=tf.keras.losses.Reduction.NONE
+        )  # delta is kappa in paper
         self.optimizer = tf.keras.optimizers.Adam(0.0001)
 
     def target_density(self, mode, advantage, beta):
