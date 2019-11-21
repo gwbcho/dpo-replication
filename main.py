@@ -1,5 +1,6 @@
-import os
 import argparse
+import json
+import os
 
 import gym
 import numpy as np
@@ -198,6 +199,7 @@ def main():
                     eval_rewards = evaluate_policy(gac, eval_env, args.eval_episodes)
                     eval_reward = sum(eval_rewards) / args.eval_episodes
                     print('eval_reward:', eval_reward)
+
                     results_dict['eval_rewards'].append((total_steps, eval_rewards))
                     with open ('results.txt', 'w') as file:
                         file.write(json.dumps(results_dict))
@@ -209,8 +211,10 @@ def main():
                 for _ in range(args.T):
                     gac.train_one_step()
 
-    utils.save_model(gac.actor, base_dir)
+    with open('results.txt', 'w') as file:
+        file.write(json.dumps(results_dict))
 
+    utils.save_model(gac.actor, base_dir)
 
 
 if __name__ == '__main__':
