@@ -117,7 +117,7 @@ def evaluate_policy(policy, env, episodes):
             action = tf.squeeze(action, [0]).numpy()
             state, reward, is_terminal, _ = env.step(action)
             state, reward = np.float32(state), np.float32(reward)
-            rewards.append(reward)
+            rewards.append(float(reward))
             # env.render()
     return rewards
 
