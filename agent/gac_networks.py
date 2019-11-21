@@ -406,11 +406,15 @@ class MyGenerativeActor(tf.Module):
         return loss
 
     def _target_density(self, mode, advantage, beta):
+        '''
+        advantage in shape: [state_batch_size, action_samples, 1]
+        '''
         if mode == "linear":
-            indicator = tf.cast(advantage>0, tf.float32)
-            return indicator * advantage / (tf.reduce_sum(advantage * indicator) + 1e-4)
+            ind_adv = tf.cast(advantage>0, tf.float32) * advantage + 1e-6
+            return  ind_adv/tf.reduce_sum(ind_adv, axis = 1, keepdims = True)
         elif mode == "boltzmann":
-            return tf.nn.softmax(advantage/beta)
+            exp_adv = tf.exp(advantage)
+            return  exp_adv/tf.reduce_sum(exp_adv, axis = 1, keepdims = True)
         else:
             raise NotImplementedError
 
@@ -426,9 +430,14 @@ class MyGenerativeActor(tf.Module):
         return eltwise_loss
 
     def _sample_actions(self, states, target_critics, target_value):
-        
-        batch_size = states.shape[0]
-        actions = tf.random.uniform((batch_size, self.action_dim), minval=-1.0, maxval=1.0)
+        '''
+        states in shape: [state_batch_size, action_samples, 1]
+        return
+            actions in shape [state_batch_size, action_samples, action_dim]
+            advantage in shape: [state_batch_size, action_samples, 1]
+        '''
+        size = states.shape.as_list(); size[-1] = self.action_dim
+        actions = tf.random.uniform(size, minval=-1.0, maxval=1.0)
         advantages = target_critics(states, actions) - target_value(states)
         return actions, advantages
 
@@ -437,7 +446,7 @@ class MyGenerativeActor(tf.Module):
         return self(states, tf.random.uniform((batch_size, self.action_dim), minval=0.0, maxval=1.0))
     
     def train(self, transitions, target_actor, target_critics, target_value, args):
-        tiled_states = tf.tile(transitions.s, [args.action_samples,1])
+        tiled_states =  tf.tile(tf.expand_dims(transitions.s, axis = 1), [1, args.action_samples,1])
         xi, advantages = self._sample_actions(tiled_states, target_critics, target_value)
         weights = self._target_density(args.mode, advantages, args.beta)
 
