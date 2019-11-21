@@ -200,7 +200,7 @@ def main():
                     eval_reward = sum(eval_rewards) / args.eval_episodes
                     print('eval_reward:', eval_reward)
 
-                    results_dict['eval_rewards'].append((total_steps, eval_rewards))
+                    results_dict['eval_rewards'].append([total_steps, eval_rewards])
                     with open ('results.txt', 'w') as file:
                         file.write(json.dumps(results_dict))
 
