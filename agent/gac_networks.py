@@ -13,6 +13,9 @@ maintain the same architecture, it is advisable that the value and critic netwok
 classes, if for no other reason than legibility.
 """
 
+
+
+
 class CosineBasisLinear(tf.Module):
     def __init__(self, n_basis_functions, embed_dim, activation = None):
         """
@@ -67,11 +70,17 @@ class IQNActor(tf.Module):
         self.state_dim = state_dim
         self.action_dim = action_dim
         self.module_type = 'IQNActor'
-        self.huber_loss_function = tf.keras.losses.Huber(delta=1.0)  # delta is kappa in paper
         self.optimizer = tf.keras.optimizers.Adam(0.0001)
     
     def __call__(self):
         raise NotImplementedError
+
+    def _eltwise_huber_loss(self, x, d=1):
+        loss1 = 0.5 * x * x  # if |x| <= d
+        loss2 = d * (tf.abs(x)- 0.5 * d)  # if |x| > d
+        indicator = tf.cast(tf.abs(x)>d, dtype = tf.float32)
+        loss = indicator * loss2 + (1-indicator) * loss1
+        return loss
 
     def _target_density(self, mode, advantage, beta):
         """
@@ -108,7 +117,7 @@ class IQNActor(tf.Module):
         """
 
         I_delta = tf.dtypes.cast(((actions - target_actions) > 0), tf.float32)
-        eltwise_huber_loss = self.huber_loss_function(target_actions, actions)
+        eltwise_huber_loss = self._eltwise_huber_loss(target_actions-actions)
         # delta is kappa in paper
         eltwise_loss = tf.math.abs(taus - I_delta) * eltwise_huber_loss * weights
         #(batch_size, action_dim)
@@ -363,6 +372,84 @@ class StochasticActor(IQNActor):
         actions = self.output_action_layer(merge_embedding) # (batch_size, self.action_dim)
 
         return actions
+
+
+
+class MyGenerativeActor(tf.Module):
+    def __init__(self, state_dim, action_dim, n_basis_functions = 8):
+        '''
+        Using implicit quantile regression to train the actor
+        '''
+        super(MyGenerativeActor, self).__init__()
+        
+        self.module_type = 'MyGenerativeActor'
+        self.huber_loss_function = tf.keras.losses.Huber(delta=1.0) 
+
+        self.state_dim = state_dim
+        self.action_dim = action_dim
+        self.module_type = 'IQNActor'
+        self.optimizer = tf.keras.optimizers.Adam(0.0001)
+
+        self.fnn = FNN([state_dim + action_dim, 128, 128, 1])
+        self.get_action(tf.zeros([1,self.state_dim]))
+
+    def __call__(self, states, taus):
+        x = tf.concat([states, taus], axis=-1)
+        return self.fnn(x)
+
+
+    def _eltwise_huber_loss(self, x, d=1):
+        loss1 = 0.5 * x * x  # if |x| <= d
+        loss2 = d * (tf.abs(x)- 0.5 * d)  # if |x| > d
+        indicator = tf.cast(tf.abs(x)>d, dtype = tf.float32)
+        loss = indicator * loss2 + (1-indicator) * loss1
+        return loss
+
+    def _target_density(self, mode, advantage, beta):
+        if mode == "linear":
+            indicator = tf.cast(advantage>0, tf.float32)
+            return  indicator * advantage / tf.reduce_sum(advantage * indicator)
+        elif mode == "boltzmann":
+            return tf.nn.softmax(advantage/beta)
+        else:
+            raise NotImplementedError
+
+    def _huber_quantile_loss(self, x, taus):
+        '''
+        Compute Huber losses for quantile regression.
+        |taus - (target_actions - action) < 0| * huber_loss
+        '''
+
+        I_delta = tf.cast((x > 0), tf.float32)
+        eltwise_huber_loss = self._eltwise_huber_loss(x)
+        eltwise_loss = tf.abs(taus - I_delta) * eltwise_huber_loss
+        return eltwise_loss
+
+    def _sample_actions(self, states, target_critics, target_value):
+        
+        batch_size = states.shape[0]
+        actions = tf.random.uniform((batch_size, self.action_dim), minval=-1.0, maxval=1.0)
+        advantages = target_critics(states, actions) - target_value(states)
+        return actions, advantages
+
+    def get_action(self, states):
+        batch_size = states.shape[0]
+        return self(states, tf.random.uniform((batch_size, self.action_dim), minval=0.0, maxval=1.0))
+    
+    def train(self, transitions, target_actor, target_critics, target_value, args):
+        tiled_states = tf.tile(transitions.s, [args.action_samples,1])
+        xi, advantages = self._sample_actions(tiled_states, target_critics, target_value)
+        weights = self._target_density(args.mode, advantages, args.beta)
+
+        taus = tf.random.uniform(tf.shape(xi))
+        # taus = tf.random.uniform((1,)) * tf.ones(tf.shape(xi))
+
+        with tf.GradientTape() as tape:
+            loss = self._huber_quantile_loss(xi - self(tiled_states, taus), taus) * weights
+            loss = tf.reduce_mean(loss)
+        gradients = tape.gradient(loss, self.trainable_variables)
+        self.optimizer.apply_gradients(zip(gradients, self.trainable_variables))
+
 
 
 class Critic(tf.Module):

@@ -3,7 +3,7 @@ import numpy as np
 import tensorflow as tf
 
 # import local dependencies
-from agent.gac_networks import StochasticActor, AutoRegressiveStochasticActor, Critic, Value
+from agent.gac_networks import StochasticActor, AutoRegressiveStochasticActor, MyGenerativeActor, Critic, Value
 from agent.sac_networks import SACActor, SACCritic, SACValue
 from agent.helpers import ReplayBuffer, update, ActionSampler
 
@@ -35,11 +35,14 @@ class GACAgent:
         self.state_dim = args.state_dim
 
         if args.actor == 'IQN':
-            self.actor = StochasticActor(args.state_dim, args.action_dim)
-            self.target_actor = StochasticActor(args.state_dim, args.action_dim)
+            # self.actor = StochasticActor(args.state_dim, args.action_dim)
+            # self.target_actor = StochasticActor(args.state_dim, args.action_dim)
+            self.actor = MyGenerativeActor(args.state_dim, args.action_dim)
+            self.target_actor = MyGenerativeActor(args.state_dim, args.action_dim)
+            
         elif args.actor == 'AIQN':
             self.actor = AutoRegressiveStochasticActor(args.state_dim, args.action_dim)
-            self.target_actor = AutoRegressiveStochasticActor(args.state_dim, args.action_dim)
+            self.target_actor = AutoRegressiveStochasticActor(args.state_dim, args.action_dim)        
         else:
             raise NotImplementedError
 
@@ -75,7 +78,6 @@ class GACAgent:
         update(self.target_critics, self.critics, self.args.tau)
         update(self.target_value, self.value, self.args.tau)
 
-       
 
     def get_action(self, states):
         """
