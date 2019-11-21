@@ -6,6 +6,7 @@ import gym
 import numpy as np
 import tensorflow as tf
 from tqdm import trange
+import json
 
 import utils
 from environment.normalized_actions import NormalizedActions
@@ -106,18 +107,19 @@ def evaluate_policy(policy, env, episodes):
     Run the environment env using policy for episodes number of times.
     Return: average rewards per episode.
     """
-    total_reward = 0.0
+    rewards = []
     for _ in range(episodes):
-        state = env.reset()
+        state = np.float32(env.reset())
         is_terminal = False
         while not is_terminal:
             action = policy.get_action(tf.convert_to_tensor([state], dtype=tf.float32))
             # remove the batch_size dimension if batch_size == 1
             action = tf.squeeze(action, [0]).numpy()
             state, reward, is_terminal, _ = env.step(action)
-            total_reward += reward
+            state, reward = np.float32(state), np.float32(reward)
+            rewards.append(reward)
             # env.render()
-    return total_reward / episodes
+    return rewards
 
 
 def main():
@@ -174,6 +176,7 @@ def main():
                 # remove the batch_size dimension if batch_size == 1
                 action = tf.squeeze(action, [0]).numpy()
                 next_state, reward, is_terminal, _ = env.step(action)
+                next_state, reward = np.float32(next_state), np.float32(reward)
                 gac.store_transitions(state, action, reward, next_state, is_terminal)
                 episode_rewards += reward
                 # print('average_rewards:', average_rewards)
@@ -181,7 +184,7 @@ def main():
                 # check if game is terminated to decide how to update state, episode_steps,
                 # episode_rewards
                 if is_terminal:
-                    state = env.reset()
+                    state = np.float32(env.reset())
                     results_dict['train_rewards'].append(
                         (total_steps, episode_rewards / episode_steps)
                     )
@@ -193,9 +196,13 @@ def main():
 
                 # evaluate
                 if total_steps % args.eval_freq == 0:
-                    eval_reward = evaluate_policy(gac, eval_env, args.eval_episodes)
+                    eval_rewards = evaluate_policy(gac, eval_env, args.eval_episodes)
+                    eval_reward = sum(eval_rewards) / args.eval_episodes
                     print('eval_reward:', eval_reward)
-                    results_dict['eval_rewards'].append([total_steps, eval_reward])
+
+                    results_dict['eval_rewards'].append((total_steps, eval_rewards))
+                    with open ('results.txt', 'w') as file:
+                        file.write(json.dumps(results_dict))
 
                 total_steps += 1
 
