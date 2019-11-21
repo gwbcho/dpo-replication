@@ -112,8 +112,8 @@ def evaluate_policy(policy, env, episodes):
         while not is_terminal:
             action = policy.get_action(tf.convert_to_tensor([state], dtype=tf.float32))
             # remove the batch_size dimension if batch_size == 1
-            # action = tf.squeeze(action, [0])
-            state, reward, is_terminal, _ = env.step(action[0])
+            action = tf.squeeze(action, [0]).numpy()
+            state, reward, is_terminal, _ = env.step(action)
             total_reward += reward
             # env.render()
     return total_reward / episodes
@@ -171,13 +171,14 @@ def main():
                 # print('t:', t)
                 action = gac.get_action(tf.convert_to_tensor([state], dtype=tf.float64))
                 # remove the batch_size dimension if batch_size == 1
-                # action = tf.squeeze(action, [0])
-                next_state, reward, is_terminal, _ = env.step(action[0])
+                action = tf.squeeze(action, [0]).numpy()
+                next_state, reward, is_terminal, _ = env.step(action)
                 gac.store_transitions(state, action, reward, next_state, is_terminal)
                 episode_rewards += reward
                 # print('average_rewards:', average_rewards)
 
-                # check if game is terminated to decide how to update state, episode_steps, episode_rewards
+                # check if game is terminated to decide how to update state, episode_steps,
+                # episode_rewards
                 if is_terminal:
                     state = env.reset()
                     results_dict['train_rewards'].append(

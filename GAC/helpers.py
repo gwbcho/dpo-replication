@@ -72,7 +72,6 @@ class ReplayBuffer:
         return self.transitions
 
 
-
 def update(target, source, rate):
     """
     update function.
