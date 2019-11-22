@@ -1,5 +1,4 @@
 import os
-os.environ["CUDA_VISIBLE_DEVICES"]="0"
 import argparse
 import gym
 import numpy as np
@@ -13,6 +12,9 @@ def create_argument_parser():
 
     parser = argparse.ArgumentParser(
             description='An implementation of the Distributional Policy Optimization paper.')
+
+    parser.add_argument('--gpu', type=int, default=0,
+            help='GPU ID')
     parser.add_argument('--environment', default="HalfCheetah-v2",
             help='name of the environment to run. default="HalfCheetah-v2"')
     parser.add_argument('--gamma', type=float, default=0.99, metavar='G',
@@ -73,7 +75,7 @@ def evaluate_policy(actor, env, args):
 
 def main():
     args = create_argument_parser().parse_args()
-
+    os.environ["CUDA_VISIBLE_DEVICES"]=str(args.gpu)
     """
     Create Mujoco environment
     """
