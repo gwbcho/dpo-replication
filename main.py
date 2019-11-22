@@ -205,7 +205,7 @@ def main():
                         'eval_reward_variance': eval_variance
                     })
                     with open ('results.txt', 'w') as file:
-                        file.write(json.dumps(results_dict))
+                        file.write(json.dumps(results_dict['eval_rewards']))
                 total_steps += 1
             # train
             if gac.replay.size >= args.batch_size:
