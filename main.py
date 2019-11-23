@@ -88,12 +88,12 @@ def create_argument_parser():
         help='Uniformly smooth the Q function in this range.'
     )
     parser.add_argument(
-        '--mode', type=str, default='linear', choices=['linear', 'max', 'boltzman', 'uniform'],
+        '--mode', type=str, default='linear', choices=['linear', 'max', 'boltzmann', 'uniform'],
         help='Target policy is constructed based on this operator. default="linear" '
     )
     parser.add_argument(
         '--beta', type=float, default=1.0,
-        help='Boltzman Temperature for normalizing actions, default=1.0'
+        help='Boltzmann Temperature for normalizing actions, default=1.0'
     )
     parser.add_argument(
         '--num_steps', type=int, default=2000000, metavar='N',
