@@ -142,7 +142,6 @@ class GACAgent:
         target_actions += tf.random.normal(target_actions.shape) * 0.01
         target_actions = tf.clip_by_value(target_actions, -1, 1)
         target_q = self.target_critics(tiled_states, target_actions)
-
         # Sample multiple actions both from the target policy and from a uniform distribution
         # over the action space. These will be used to determine the target distribution
         random_actions = tf.random.uniform(target_actions.shape, minval=-1.0, maxval=1.0)
