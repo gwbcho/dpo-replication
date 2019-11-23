@@ -123,7 +123,7 @@ class IQNActor(tf.Module):
         the batch_size here combines the state_batch_size and action samples.
 
         Args:
-            states: (batch_size,  state_dim)
+            states: (batch_size, state_dim)
             supervise_actions: (batch_size, action_dim)
             advantage: (batch_size, 1)
             mode (string): the type of distribution being used

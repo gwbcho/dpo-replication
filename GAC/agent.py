@@ -102,13 +102,12 @@ class GACAgent:
         self.critics.train(transitions, self.target_value, self.args.gamma)
         self.value.train(
             transitions,
-            # self.action_sampler # WE WILL DECIDE WHETHER WE NEED THIS LATER
             self.target_actor,
             self.target_critics,
             self.args.action_samples
         )
-        tiled_states = tf.tile(transitions.s, [self.args.action_samples, 1])
-        states, actions, advantages = self._sample_positive_advantage_actions(tiled_states)
+        # note that transitions.s represents the sampled states from the memory buffer
+        states, actions, advantages = self._sample_positive_advantage_actions(transitions.s)
         if advantages.shape[0]:
             self.actor.train(
                 states,
@@ -129,28 +128,42 @@ class GACAgent:
         same state multiple times.
 
         Args:
-            states (tf.Variable): dimension (batch_size * K, state_dim)
+            states (tf.Variable): states of dimension (batch_size, state_dim)
 
         Returns:
             good_states (list): Set of positive advantage states (batch_size, sate_dim)
             good_actions (list): Set of positive advantage actions
             advantages (list[float]): set of positive advantage values (Q - V)
         """
-        # Sample actions
-        actions = self.action_sampler.get_actions(self.target_actor, states)
-        actions = tf.concat([actions, tf.random.uniform(actions.shape, minval=-1.0, maxval=1.0)], 0)
-        states = tf.concat([states, states], 0)
-        # compute Q and V dimensions (2 * batch_size * K, 1)
-        q = self.target_critics(states, actions)
-        v = self.target_value(states)
+        # tile states to be of dimension (batch_size * K, state_dim)
+        tiled_states = tf.tile(states, [self.args.action_samples, 1])
+        # Sample actions with noise for exploration
+        target_actions = self.action_sampler.get_actions(self.target_actor, tiled_states)
+        target_actions += tf.random.normal(target_actions.shape) * 0.01
+        target_actions = tf.clip_by_value(target_actions, -1, 1)
+        target_q = self.target_critics(tiled_states, target_actions)
+        # Sample multiple actions both from the target policy and from a uniform distribution
+        # over the action space. These will be used to determine the target distribution
+        random_actions = tf.random.uniform(target_actions.shape, minval=-1.0, maxval=1.0)
+        random_q = self.target_critics(tiled_states, random_actions)
+        # create target actions vector, consistent of purely random actions and noisy actions
+        # for the sake of exploration
+        target_actions = tf.concat([target_actions, random_actions], 0)
+        # compute Q and V values with dimensions (2 * batch_size * K, 1)
+        q = tf.concat([target_q, random_q], 0)
+        # determine the estimated value of a given state
+        v = self.target_value(tiled_states)
+        v = tf.concat([v, v], 0)
+        # expand tiled states to allow for indexing later on
+        tiled_states = tf.concat([tiled_states, tiled_states], 0)
         # remove unused dimensions
         q_squeezed = tf.squeeze(q)
         v_squeezed = tf.squeeze(v)
         # select s, a with positive advantage
         squeezed_indicies = tf.where(q_squeezed > v_squeezed)
         # collect all advantegeous states and actions
-        good_states = tf.gather_nd(states, squeezed_indicies)
-        good_actions = tf.gather_nd(actions, squeezed_indicies)
+        good_states = tf.gather_nd(tiled_states, squeezed_indicies)
+        good_actions = tf.gather_nd(target_actions, squeezed_indicies)
         # retrieve advantage values
         advantages = tf.gather_nd(q-v, squeezed_indicies)
         return good_states, good_actions, advantages
