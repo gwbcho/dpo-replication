@@ -9,7 +9,7 @@ from tqdm import trange
 import json
 
 import utils
-from environment.normalized_actions import NormalizedActions
+from environment.wapper import Wrapper
 from GAC.networks import AutoRegressiveStochasticActor as AIQN
 from GAC.networks import StochasticActor as IQN
 from GAC.networks import Critic, Value
@@ -131,8 +131,8 @@ def main():
     """
     Create Mujoco environment
     """
-    env = NormalizedActions(gym.make(args.environment))
-    eval_env = NormalizedActions(gym.make(args.environment))
+    env = Wrapper(gym.make(args.environment), args)
+    eval_env = Wrapper(gym.make(args.environment), args)
     args.action_dim = env.action_space.shape[0]
     args.state_dim = env.observation_space.shape[0]
 
@@ -172,7 +172,7 @@ def main():
                 Get an action from neural network and run it in the environment
                 """
                 # print('t:', t)
-                action = gac.get_action(tf.convert_to_tensor([state], dtype=tf.float64))
+                action = gac.get_action(tf.convert_to_tensor([state], dtype=tf.float32))
                 # remove the batch_size dimension if batch_size == 1
                 action = tf.squeeze(action, [0]).numpy()
                 next_state, reward, is_terminal, _ = env.step(action)
