@@ -8,7 +8,7 @@ import tensorflow as tf
 from tqdm import trange
 import json
 
-import utils
+import utils.utils as utils
 from environment.wapper import Wrapper
 from GAC.networks import AutoRegressiveStochasticActor as AIQN
 from GAC.networks import StochasticActor as IQN
