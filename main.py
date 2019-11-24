@@ -8,7 +8,7 @@ import tensorflow as tf
 from tqdm import trange
 import json
 
-import utils
+import utils.utils as utils
 from environment.wapper import Wrapper
 from GAC.networks import AutoRegressiveStochasticActor as AIQN
 from GAC.networks import StochasticActor as IQN
@@ -186,7 +186,7 @@ def main():
                 if is_terminal:
                     state = np.float32(env.reset())
                     results_dict['train_rewards'].append(
-                        (total_steps, episode_rewards / episode_steps)
+                        (total_steps, episode_rewards)
                     )
                     episode_steps = 0
                     episode_rewards = 0
