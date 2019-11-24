@@ -186,7 +186,7 @@ def main():
                 if is_terminal:
                     state = np.float32(env.reset())
                     results_dict['train_rewards'].append(
-                        (total_steps, episode_rewards / episode_steps)
+                        (total_steps, episode_rewards)
                     )
                     episode_steps = 0
                     episode_rewards = 0
