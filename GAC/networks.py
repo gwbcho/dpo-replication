@@ -398,7 +398,7 @@ class Critic(tf.Module):
         # Line 10 of Algorithm 2
         yQ = transitions.r + gamma * value(transitions.sp)
         # Line 11-12 of Algorithm 2
-        x = tf.concat([transitions.s, transitions.a], -1)
+        x = tf.concat([transitions.s, transitions.a], 1)
         with tf.GradientTape() as tape1:
             loss1 = tf.keras.losses.mse(yQ, self.fnn1(x))
         gradients1 = tape1.gradient(loss1, self.fnn1.trainable_variables)
@@ -442,14 +442,7 @@ class Value(tf.Module):
         """
         # Each state needs action_samples action samples
         # originally, transitions.s is [batch_size , state_dim]
-
-        # we tiled in this way, so that after reshape we get back in the same order.
-        states = tf.expand_dims(transitions.s, 1) # [batch_size , 1 , state_dim]
-        # states = tf.broadcast_to(states, [states.shape[0], action_samples] + states.shape[2:])
-        states = tf.tile(states, [1, action_samples, 1])
-        # [batch_size , action_samples , state dim]
-        states = tf.reshape(states, [-1, self.state_dim])
-        # [batch_size x action_samples , state dim]
+        states = tf.tile(transitions.s, [action_samples, 1])
 
         """
         Line 13 of Algorithm 2.
