@@ -206,7 +206,9 @@ class AutoRegressiveStochasticActor(IQNActor):
         # dimension. Note that the actions are in the domain [0, 1] (Why? I dunno).
         for idx in range(self.action_dim):
             # batch x 1 x 400
-            action_embedding = self.action_embedding(tf.reshape(action, (batch_size, 1, 1)))
+            action_embedding = tf.nn.leaky_relu(
+                self.action_embedding(tf.reshape(action, (batch_size, 1, 1)))
+            )
             rnn_input = tf.concat([state_embedding, action_embedding], axis=2)
             # Note that the RNN states encode the function approximation for the conditional
             # probability of the ordered sequence of vectors in d dimension space. Effectively,
@@ -250,7 +252,7 @@ class AutoRegressiveStochasticActor(IQNActor):
         shifted_actions = tf.Variable(tf.zeros_like(supervise_actions))
         # assign shifted actions
         shifted_actions = shifted_actions[:, 1:].assign(supervise_actions[:, :-1])
-        provided_action_embedding = self.action_embedding(shifted_actions)
+        provided_action_embedding = tf.nn.leaky_relu(self.action_embedding(shifted_actions))
 
         rnn_input = tf.concat([state_embedding, provided_action_embedding], axis=2)
         gru_out, _ = self.rnn(rnn_input)
@@ -398,7 +400,8 @@ class Critic(tf.Module):
         # Add tau random noise sampler for Q value normalization
         batch_size = transitions.s.shape[0]
         noise = (tf.random.uniform((batch_size, self.action_dim), 0, 1) * 2 - 1) * q_normalization
-        action_batch = tf.clip_by_value(transitions.a + noise, -1, 1)
+        noisy_actions = transitions.a + noise
+        action_batch = tf.clip_by_value(noisy_actions, -1, 1)
         # Line 10 of Algorithm 2
         yQ = transitions.r + gamma * value(transitions.sp)
         # Line 11-12 of Algorithm 2
