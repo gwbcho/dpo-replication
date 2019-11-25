@@ -381,7 +381,7 @@ class Critic(tf.Module):
         pred2 = self.fnn2(x)
         return tf.minimum(pred1, pred2)
 
-    def train(self, transitions, value, gamma):
+    def train(self, transitions, value, gamma, q_normalization=0.01):
         """
         transitions is of type named tuple policy.policy_helpers.helpers.Transition
         q1, q2 are seperate Q networks, thus can be trained separately
@@ -395,10 +395,14 @@ class Critic(tf.Module):
         Returns:
             critic history tuple (two histories for the two critic models in general)
         """
+        # Add tau random noise sampler for Q value normalization
+        batch_size = transitions.s.shape[0]
+        noise = (tf.random.uniform((batch_size, self.action_dim), 0, 1) * 2 - 1) * q_normalization
+        action_batch = tf.clip_by_value(transitions.a + noise, -1, 1)
         # Line 10 of Algorithm 2
         yQ = transitions.r + gamma * value(transitions.sp)
         # Line 11-12 of Algorithm 2
-        x = tf.concat([transitions.s, transitions.a], -1)
+        x = tf.concat([transitions.s, action_batch], -1)
         with tf.GradientTape() as tape1:
             loss1 = tf.keras.losses.mse(yQ, self.fnn1(x))
         gradients1 = tape1.gradient(loss1, self.fnn1.trainable_variables)
