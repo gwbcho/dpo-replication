@@ -39,15 +39,20 @@ class GACAgent:
                     batch_size (int): batch size
                     q_normalization (float): q value normalization rate
                     gamma (float): value used in critic training
-                    normalize_obs(boolean): boolean to indicate that you want to normalize
+                    normalize_obs (boolean): boolean to indicate that you want to normalize
                         observations
+                    normalize_returns (boolean): boolean to indicate that you want to normalize
+                        return values (usually done for numerical stability)
         """
         self.args = args
         self.action_dim = args.action_dim
         self.state_dim = args.state_dim
+        self.gamma = args.gamma
+
+        # normalization
         self.normalize_observations = args.normalize_obs
         self.q_normalization = args.q_normalization
-        self.gamma = args.gamma
+        self.normalize_returns = args.normalize_returns
 
         if args.actor == 'IQN':
             self.actor = StochasticActor(args.state_dim, args.action_dim)
@@ -62,6 +67,13 @@ class GACAgent:
             self.obs_rms = RunningMeanStd(shape=self.state_dim)
         else:
             self.obs_rms = None
+
+        if self.normalize_returns
+            self.ret_rms = RunningMeanStd(shape=1)
+            self.ret = 0
+            self.clip_rew = 10
+        else:
+            self.ret_rms = None
 
         # initialize trainable variables
         self.actor(
@@ -118,12 +130,14 @@ class GACAgent:
         action_batch = normalize(transitions.a, self.obs_rms)
         reward_batch = normalize(tf.Variable(transitions.r, dtype=tf.float32), self.obs_rms)
         next_state_batch = normalize(tf.Variable(transitions.sp, dtype=tf.float32), self.obs_rms)
+        terminal_mask = transitions.it
         # transitions is sampled from replay buffer
         self.critics.train(
             state_batch,
             action_batch,
             reward_batch,
             next_state_batch,
+            terminal_mask,
             self.target_value,
             self.args.gamma,
             self.q_normalization
@@ -247,7 +261,7 @@ class GACAgent:
 
     def store_transitions(self, state, action, reward, next_state, is_done):
         """
-        Store the transition in the replay buffer.
+        Store the transition in the replay buffer with normalizing, should it be specified.
 
         Args:
             state (tf.Variable): (batch_size, state_size) state vector
@@ -257,3 +271,12 @@ class GACAgent:
             is_done (boolean): value to indicate that the state is terminal
         """
         self.replay.store(state, action, reward, next_state, is_done)
+        num_inputs = state.shape[0]
+        for batch_item in range(num_inputs):
+            if self.normalize_observations:
+                self.obs_rms.update(state[batch_item].numpy())
+            if self.normalize_returns:
+                self.ret = self.ret * self.gamma + reward[batch_item]
+                self.ret_rms.update(np.array([self.ret]))
+                if is_done:
+                    self.ret = 0

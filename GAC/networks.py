@@ -387,7 +387,8 @@ class Critic(tf.Module):
         pred2 = self.fnn2(x)
         return tf.minimum(pred1, pred2)
 
-    def train(self, states, actions, rewards, next_states, value, gamma, q_normalization=0.01):
+    def train(self, states, actions, rewards, next_states, terminal_mask, value, gamma,
+              q_normalization=0.01):
         """
         transitions is of type named tuple policy.policy_helpers.helpers.Transition
         q1, q2 are seperate Q networks, thus can be trained separately
@@ -410,7 +411,7 @@ class Critic(tf.Module):
         noisy_actions = actions + noise
         action_batch = tf.clip_by_value(noisy_actions, -1, 1)
         # Line 10 of Algorithm 2
-        yQ = rewards + gamma * value(next_states)
+        yQ = rewards + gamma * value(next_states) * (1-terminal_mask)
         # Line 11-12 of Algorithm 2
         x = tf.concat([states, action_batch], -1)
         with tf.GradientTape() as tape1:
