@@ -217,7 +217,7 @@ def main():
                 action = tf.squeeze(action, [0]).numpy()
                 next_state, reward, is_terminal, _ = env.step(action)
                 next_state, reward = np.float32(next_state), np.float32(reward)
-                gac.store_transitions(state, action, reward, next_state, is_terminal)
+                gac.store_transition(state, action, reward, next_state, is_terminal)
                 episode_rewards += reward
                 # print('average_rewards:', average_rewards)
 

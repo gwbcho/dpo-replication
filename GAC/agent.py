@@ -259,24 +259,22 @@ class GACAgent:
         for variable in params:
             variable.assign(variable + tf.random.normal(param.shape) * param_noise.current_stddev)
 
-    def store_transitions(self, state, action, reward, next_state, is_done):
+    def store_transition(self, state, action, reward, next_state, is_done):
         """
         Store the transition in the replay buffer with normalizing, should it be specified.
 
         Args:
             state (tf.Variable): (batch_size, state_size) state vector
             action (tf.Variable): (batch_size, action_size) action vector
-            reward (float): reward value determined by the environment
+            reward (float): reward value determined by the environment (batch_size, 1)
             next_state (tf.Variable): (batch_size, state_size) next state vector
             is_done (boolean): value to indicate that the state is terminal
         """
         self.replay.store(state, action, reward, next_state, is_done)
-        num_inputs = state.shape[0]
-        for batch_item in range(num_inputs):
-            if self.normalize_observations:
-                self.obs_rms.update(state[batch_item].numpy())
-            if self.normalize_rewards:
-                self.ret = self.ret * self.gamma + reward[batch_item]
-                self.ret_rms.update(np.array([self.ret]))
-                if is_done:
-                    self.ret = 0
+        if self.normalize_observations:
+            self.obs_rms.update(state.numpy())
+        if self.normalize_rewards:
+            self.ret = self.ret * self.gamma + reward
+            self.ret_rms.update(np.array([self.ret]))
+            if is_done:
+                self.ret = 0
