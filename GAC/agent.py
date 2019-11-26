@@ -114,16 +114,28 @@ class GACAgent:
         """
         # transitions is sampled from replay buffer
         transitions = self.replay.sample_batch(self.args.batch_size)
+        state_batch = normalize(tf.Variable(transitions.s, dtype=tf.float32), self.obs_rms)
+        action_batch = normalize(transitions.a, self.obs_rms)
+        reward_batch = normalize(tf.Variable(transitions.r, dtype=tf.float32), self.obs_rms)
+        next_state_batch = normalize(tf.Variable(transitions.sp, dtype=tf.float32), self.obs_rms)
         # transitions is sampled from replay buffer
-        self.critics.train(transitions, self.target_value, self.args.gamma, self.q_normalization)
+        self.critics.train(
+            state_batch,
+            action_batch,
+            reward_batch,
+            next_state_batch,
+            self.target_value,
+            self.args.gamma,
+            self.q_normalization
+        )
         self.value.train(
-            transitions,
+            state_batch,
             self.target_actor,
             self.target_critics,
             self.args.action_samples
         )
         # note that transitions.s represents the sampled states from the memory buffer
-        states, actions, advantages = self._sample_positive_advantage_actions(transitions.s)
+        states, actions, advantages = self._sample_positive_advantage_actions(state_batch)
         if advantages.shape[0]:
             self.actor.train(
                 states,

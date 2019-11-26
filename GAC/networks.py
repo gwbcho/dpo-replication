@@ -20,6 +20,7 @@ class CosineBasisLinear(tf.Module):
         Parametrize the embedding function using Fourier series up to n_basis_functions terms.
         It's an entry-wise embedding function, i.e. from R to R^d. Could do nonlinear transform
         with activation in the end.
+
         Class Args:
             n_basis_functions (int): the number of basis functions
             embed_dim (int): the dimensionality of embedding
@@ -329,10 +330,13 @@ class FNN(tf.Module):
         self.layers = self._build_fnn_model(arch, activation=None)
 
     def _build_fnn_model(self, arch, activation=None):
-        '''
-        arch: a list of integers discribing the width of each layer.
-        return: a list of layers.
-        '''
+        """
+        Args:
+            arch: A list of integers discribing the width of each layer.
+
+        Returns:
+            A list of layers.
+        """
         if activation is None:
             activation = tf.keras.layers.LeakyReLU(alpha=0.01)
 
@@ -383,13 +387,16 @@ class Critic(tf.Module):
         pred2 = self.fnn2(x)
         return tf.minimum(pred1, pred2)
 
-    def train(self, transitions, value, gamma, q_normalization=0.01):
+    def train(self, states, actions, rewards, next_states, value, gamma, q_normalization=0.01):
         """
         transitions is of type named tuple policy.policy_helpers.helpers.Transition
         q1, q2 are seperate Q networks, thus can be trained separately
 
         Args:
-            TODO:
+            states
+            actions
+            rewards
+            next_states
             transitions
             value
             gamma
@@ -398,14 +405,14 @@ class Critic(tf.Module):
             critic history tuple (two histories for the two critic models in general)
         """
         # Add tau random noise sampler for Q value normalization
-        batch_size = transitions.s.shape[0]
+        batch_size = states.shape[0]
         noise = (tf.random.uniform((batch_size, self.action_dim), 0, 1) * 2 - 1) * q_normalization
-        noisy_actions = transitions.a + noise
+        noisy_actions = actions + noise
         action_batch = tf.clip_by_value(noisy_actions, -1, 1)
         # Line 10 of Algorithm 2
-        yQ = transitions.r + gamma * value(transitions.sp)
+        yQ = rewards + gamma * value(next_states)
         # Line 11-12 of Algorithm 2
-        x = tf.concat([transitions.s, action_batch], -1)
+        x = tf.concat([states, action_batch], -1)
         with tf.GradientTape() as tape1:
             loss1 = tf.keras.losses.mse(yQ, self.fnn1(x))
         gradients1 = tape1.gradient(loss1, self.fnn1.trainable_variables)
@@ -432,13 +439,13 @@ class Value(tf.Module):
     def __call__(self, states):
         return self.fnn(states)
 
-    def train(self, transitions, actor, critic, action_samples = 8):
+    def train(self, states, actor, critic, action_samples = 8):
         """
         transitions is of type named tuple policy.policy_helpers.helpers.Transition
         action_sampler is of type policy.policy_helpers.helpers.ActionSampler
 
         Args:
-            TODO: Fill this out
+            states
             transitions
             actor
             critic
@@ -449,21 +456,20 @@ class Value(tf.Module):
         """
         # Each state needs action_samples action samples
         # originally, transitions.s is [batch_size , state_dim]
-
-        # we tiled in this way, so that after reshape we get back in the same order.
-        states = tf.expand_dims(transitions.s, 1) # [batch_size , 1 , state_dim]
-        # states = tf.broadcast_to(states, [states.shape[0], action_samples] + states.shape[2:])
-        states = tf.tile(states, [1, action_samples, 1])
-        # [batch_size , action_samples , state dim]
-        states = tf.reshape(states, [-1, self.state_dim])
-        # [batch_size x action_samples , state dim]
+        # now [batch_size x action_samples , state dim]
+        # we tiled in this way, so that after reshape we get back in the same order. Allowing for
+        # the average reduce_mean function to work later
+        tiled_states = tf.expand_dims(states, 1) # [batch_size , 1 , state_dim]
+        tiled_states = tf.tile(tiled_states, [1, action_samples, 1])
+        # [batch_size, action_samples, state dim]
+        tiled_states = tf.reshape(tiled_states, [-1, self.state_dim])
 
         """
         Line 13 of Algorithm 2.
         Sample actions from the actor network given current state and tau ~ U[0,1].
         """
-        taus = tf.random.uniform(shape=((states.shape[0], actor.action_dim)))
-        actions = actor(states, taus)
+        taus = tf.random.uniform(shape=(tiled_states.shape[0], actor.action_dim))
+        actions = actor(tiled_states, taus)
 
         """
         Line 14 of Algorithm 2.
@@ -472,7 +478,7 @@ class Value(tf.Module):
         Typo in Algorithm 2 line 14. 1/K is missed
         """
 
-        Q = critic(states, actions)
+        Q = critic(tiled_states, actions)
         Q = tf.reshape(Q, [-1, action_samples, 1]) #(batch_size, action_samples, 1)
         v_critic = tf.reduce_mean(Q, 1) #(batch_size, 1)
 
@@ -481,7 +487,8 @@ class Value(tf.Module):
         Get value of current state from the Value network.
         Loss is MSE.
         """
+        estimated_values = self
         with tf.GradientTape() as tape:
-            loss = tf.keras.losses.mse(v_critic, self(transitions.s))
+            loss = tf.keras.losses.mse(v_critic, self(states))
         gradients = tape.gradient(loss, self.trainable_variables)
         self.optimizer.apply_gradients(zip(gradients, self.trainable_variables))
