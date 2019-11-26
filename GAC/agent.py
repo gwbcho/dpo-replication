@@ -41,7 +41,7 @@ class GACAgent:
                     gamma (float): value used in critic training
                     normalize_obs (boolean): boolean to indicate that you want to normalize
                         observations
-                    normalize_returns (boolean): boolean to indicate that you want to normalize
+                    normalize_rewards (boolean): boolean to indicate that you want to normalize
                         return values (usually done for numerical stability)
         """
         self.args = args
@@ -52,7 +52,7 @@ class GACAgent:
         # normalization
         self.normalize_observations = args.normalize_obs
         self.q_normalization = args.q_normalization
-        self.normalize_returns = args.normalize_returns
+        self.normalize_rewards = args.normalize_rewards
 
         if args.actor == 'IQN':
             self.actor = StochasticActor(args.state_dim, args.action_dim)
@@ -68,7 +68,7 @@ class GACAgent:
         else:
             self.obs_rms = None
 
-        if self.normalize_returns
+        if self.normalize_rewards:
             self.ret_rms = RunningMeanStd(shape=1)
             self.ret = 0
             self.clip_rew = 10
@@ -275,7 +275,7 @@ class GACAgent:
         for batch_item in range(num_inputs):
             if self.normalize_observations:
                 self.obs_rms.update(state[batch_item].numpy())
-            if self.normalize_returns:
+            if self.normalize_rewards:
                 self.ret = self.ret * self.gamma + reward[batch_item]
                 self.ret_rms.update(np.array([self.ret]))
                 if is_done:
