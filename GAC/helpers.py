@@ -84,3 +84,18 @@ def update(target, source, rate):
     source_params = source.trainable_variables
     for t, s in zip(target_params, source_params):
         t.assign(t * (1.0 - rate) + s * rate)
+
+
+def normalize(x, stats):
+    if stats is None:
+        return x
+    return (
+        (x - tf.Variable(stats.mean, dtype=tf.float32)) /
+        tf.math.sqrt(tf.Variable(stats.var, dtype=tf.float32))
+    )
+
+
+def denormalize(x, stats):
+    if stats is None:
+        return x
+    return x * stats.std + stats.mean

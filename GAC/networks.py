@@ -206,7 +206,9 @@ class AutoRegressiveStochasticActor(IQNActor):
         # dimension. Note that the actions are in the domain [0, 1] (Why? I dunno).
         for idx in range(self.action_dim):
             # batch x 1 x 400
-            action_embedding = self.action_embedding(tf.reshape(action, (batch_size, 1, 1)))
+            action_embedding = tf.nn.leaky_relu(
+                self.action_embedding(tf.reshape(action, (batch_size, 1, 1)))
+            )
             rnn_input = tf.concat([state_embedding, action_embedding], axis=2)
             # Note that the RNN states encode the function approximation for the conditional
             # probability of the ordered sequence of vectors in d dimension space. Effectively,
@@ -250,7 +252,7 @@ class AutoRegressiveStochasticActor(IQNActor):
         shifted_actions = tf.Variable(tf.zeros_like(supervise_actions))
         # assign shifted actions
         shifted_actions = shifted_actions[:, 1:].assign(supervise_actions[:, :-1])
-        provided_action_embedding = self.action_embedding(shifted_actions)
+        provided_action_embedding = tf.nn.leaky_relu(self.action_embedding(shifted_actions))
 
         rnn_input = tf.concat([state_embedding, provided_action_embedding], axis=2)
         gru_out, _ = self.rnn(rnn_input)
@@ -381,7 +383,7 @@ class Critic(tf.Module):
         pred2 = self.fnn2(x)
         return tf.minimum(pred1, pred2)
 
-    def train(self, transitions, value, gamma):
+    def train(self, transitions, value, gamma, q_normalization=0.01):
         """
         transitions is of type named tuple policy.policy_helpers.helpers.Transition
         q1, q2 are seperate Q networks, thus can be trained separately
@@ -395,10 +397,15 @@ class Critic(tf.Module):
         Returns:
             critic history tuple (two histories for the two critic models in general)
         """
+        # Add tau random noise sampler for Q value normalization
+        batch_size = transitions.s.shape[0]
+        noise = (tf.random.uniform((batch_size, self.action_dim), 0, 1) * 2 - 1) * q_normalization
+        noisy_actions = transitions.a + noise
+        action_batch = tf.clip_by_value(noisy_actions, -1, 1)
         # Line 10 of Algorithm 2
         yQ = transitions.r + gamma * value(transitions.sp)
         # Line 11-12 of Algorithm 2
-        x = tf.concat([transitions.s, transitions.a], -1)
+        x = tf.concat([transitions.s, action_batch], -1)
         with tf.GradientTape() as tape1:
             loss1 = tf.keras.losses.mse(yQ, self.fnn1(x))
         gradients1 = tape1.gradient(loss1, self.fnn1.trainable_variables)

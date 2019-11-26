@@ -4,7 +4,8 @@ import tensorflow as tf
 
 # import local dependencies
 from GAC.networks import StochasticActor, AutoRegressiveStochasticActor,  Critic, Value
-from GAC.helpers import ReplayBuffer, update, ActionSampler
+from GAC.helpers import ReplayBuffer, update, ActionSampler, normalize, denormalize
+from utils.utils import RunningMeanStd
 
 
 """
@@ -36,16 +37,31 @@ class GACAgent:
                         distribution being used
                     beta (float): value used in blotzman distribution
                     batch_size (int): batch size
+                    q_normalization (float): q value normalization rate
+                    gamma (float): value used in critic training
+                    normalize_obs(boolean): boolean to indicate that you want to normalize
+                        observations
         """
         self.args = args
         self.action_dim = args.action_dim
         self.state_dim = args.state_dim
+        self.normalize_observations = args.normalize_obs
+        self.q_normalization = args.q_normalization
+        self.gamma = args.gamma
+
         if args.actor == 'IQN':
             self.actor = StochasticActor(args.state_dim, args.action_dim)
             self.target_actor = StochasticActor(args.state_dim, args.action_dim)
+            self.actor_perturbed = StochasticActor(args.state_dim, args.action_dim)
         elif args.actor == 'AIQN':
             self.actor = AutoRegressiveStochasticActor(args.state_dim, args.action_dim)
             self.target_actor = AutoRegressiveStochasticActor(args.state_dim, args.action_dim)
+            self.actor_perturbed = AutoRegressiveStochasticActor(args.state_dim, args.action_dim)
+
+        if self.normalize_observations:
+            self.obs_rms = RunningMeanStd(shape=self.state_dim)
+        else:
+            self.obs_rms = None
 
         # initialize trainable variables
         self.actor(
@@ -99,7 +115,7 @@ class GACAgent:
         # transitions is sampled from replay buffer
         transitions = self.replay.sample_batch(self.args.batch_size)
         # transitions is sampled from replay buffer
-        self.critics.train(transitions, self.target_value, self.args.gamma)
+        self.critics.train(transitions, self.target_value, self.args.gamma, self.q_normalization)
         self.value.train(
             transitions,
             self.target_actor,
@@ -173,12 +189,49 @@ class GACAgent:
         Get a set of actions for a batch of states
 
         Args:
-            states (tf.Variable): dimensions (TODO)
+            states (tf.Variable): dimensions (batch_size, state_dim)
 
         Returns:
             sampled actions for the given state with dimension (batch_size, action_dim)
         """
         return self.action_sampler.get_actions(self.actor, states)
+
+    def select_perturbed_action(self, state, action_noise=None, param_noise=None):
+        """
+        Select actions from the perturbed actor using action noise and parameter noise
+
+        Args:
+            state (tf.Variable): tf variable containing the state vector
+            action_niose (function): action noise function which will construct noise from some
+                distribution
+            param_noise (boolean): boolean indicating that parameter noise is necessary
+
+        Returns:
+            action vector of dimension (batch_size, action_dim). Note that if both action noise and
+                param noise are None, this function is the same as get_action.
+        """
+        state = normalize(tf.Variable(state, dtype=tf.float32), self.obs_rms)
+        if param_noise is not None:
+            action = self.action_sampler.get_actions(self.actor_perturbed, state)
+        else:
+            action = self.action_sampler.get_actions(self.actor, state)
+        if action_noise is not None:
+            action += tf.Variable(action_noise(), dtype=tf.float32)
+        action = tf.clip_by_value(action, -1, 1)
+        return action
+
+    def perturb_actor_parameters(self, param_noise):
+        """
+        Apply parameter noise to actor model, for exploration
+
+        Args:
+            param_noise (AdaptiveParamNoiseSpec): Object containing adaptive parameter noise
+                specifications
+        """
+        update(self.actor_perturbed, self.actor, 1)
+        params = self.actor_perturbed.trainable_variables
+        for variable in params:
+            variable.assign(variable + tf.random.normal(param.shape) * param_noise.current_stddev)
 
     def store_transitions(self, state, action, reward, next_state, is_done):
         """

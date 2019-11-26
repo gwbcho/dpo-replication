@@ -9,6 +9,8 @@ from tqdm import trange
 import json
 
 import utils.utils as utils
+from noises.ounoise import NormalActionNoise, OrnsteinUhlenbeckActionNoise
+from noises.param_noise import AdaptiveParamNoiseSpec, ddpg_distance_metric
 from environment.wapper import Wrapper
 from GAC.networks import AutoRegressiveStochasticActor as AIQN
 from GAC.networks import StochasticActor as IQN
@@ -102,6 +104,13 @@ def create_argument_parser():
     return parser
 
 
+def _reset_noise(agent, a_noise, p_noise):
+    if a_noise is not None:
+        a_noise.reset()
+    if p_noise is not None:
+        agent.perturb_actor_parameters(p_noise)
+
+
 def evaluate_policy(policy, env, episodes):
     """
     Run the environment env using policy for episodes number of times.
@@ -136,6 +145,27 @@ def main():
     args.action_dim = env.action_space.shape[0]
     args.state_dim = env.observation_space.shape[0]
 
+    if args.noise == 'ou':
+        noise = OrnsteinUhlenbeckActionNoise(
+            mu=np.zeros(env.action_space.shape[0]),
+            sigma=float(args.noise_scale) * np.ones(env.action_space.shape[0])
+        )
+    elif args.noise == 'normal':
+        noise = NormalActionNoise(
+            mu=np.zeros(env.action_space.shape[0]),
+            sigma=float(args.noise_scale) * np.ones(env.action_space.shape[0])
+        )
+    else:
+        noise = None
+
+    if args.noise == 'param':
+        param_noise = AdaptiveParamNoiseSpec(
+            initial_stddev=args.noise_scale,
+            desired_action_stddev=args.noise_scale
+        )
+    else:
+        param_noise = None
+
     base_dir = os.getcwd() + '/models/' + args.environment + '/'
     run_number = 0
     while os.path.exists(base_dir + str(run_number)):
@@ -159,12 +189,15 @@ def main():
         nb_epochs = int(num_steps) // (args.epoch_cycles * args.rollout_steps)
     else:
         nb_epochs = 500
+
+    _reset_noise(gac, noise, param_noise)
     """
     training loop
     """
     average_rewards = 0
     count = 0
     total_steps = 0
+    train_steps = 0
     for epoch in trange(nb_epochs):
         for cycle in range(args.epoch_cycles):
             for rollout in range(args.rollout_steps):
@@ -172,7 +205,14 @@ def main():
                 Get an action from neural network and run it in the environment
                 """
                 # print('t:', t)
-                action = gac.get_action(tf.convert_to_tensor([state], dtype=tf.float32))
+                if total_steps < args.start_timesteps:
+                    action = tf.expand_dims(env.action_space.sample(), 0)
+                else:
+                    action = gac.select_perturbed_action(
+                        tf.convert_to_tensor([state], dtype=tf.float32),
+                        noise,
+                        param_noise
+                    )
                 # remove the batch_size dimension if batch_size == 1
                 action = tf.squeeze(action, [0]).numpy()
                 next_state, reward, is_terminal, _ = env.step(action)
@@ -190,6 +230,7 @@ def main():
                     )
                     episode_steps = 0
                     episode_rewards = 0
+                    _reset_noise(gac, noise, param_noise)
                 else:
                     state = next_state
                     episode_steps += 1
@@ -201,16 +242,30 @@ def main():
                     eval_variance = float(np.var(eval_rewards))
                     results_dict['eval_rewards'].append({
                         'total_steps': total_steps,
+                        'train_steps': train_steps,
                         'average_eval_reward': eval_reward,
                         'eval_reward_variance': eval_variance
                     })
-                    with open ('results.txt', 'w') as file:
+                    with open('results.txt', 'w') as file:
                         file.write(json.dumps(results_dict['eval_rewards']))
+
                 total_steps += 1
             # train
             if gac.replay.size >= args.batch_size:
                 for _ in range(args.T):
+                    if train_steps % args.param_noise_interval == 0 and param_noise is not None:
+                        episode_transitions = gac.replay.sample_batch(args.batch_size)
+                        states = episode_transitions.s
+                        unperturbed_actions = gac.get_action(states)
+                        perturbed_actions = episode_transitions.a
+                        ddpg_dist = ddpg_distance_metric(
+                            perturbed_actions.numpy(),
+                            unperturbed_actions.numpy()
+                        )
+                        param_noise.adapt(ddpg_dist)
+
                     gac.train_one_step()
+                    train_steps += 1
 
     with open('results.txt', 'w') as file:
         file.write(json.dumps(results_dict))
