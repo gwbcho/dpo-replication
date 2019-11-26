@@ -126,10 +126,10 @@ class GACAgent:
         """
         # transitions is sampled from replay buffer
         transitions = self.replay.sample_batch(self.args.batch_size)
-        state_batch = normalize(tf.Variable(transitions.s, dtype=tf.float32), self.obs_rms)
+        state_batch = normalize(transitions.s, self.obs_rms)
         action_batch = transitions.a
-        reward_batch = normalize(tf.Variable(transitions.r, dtype=tf.float32), self.ret_rms)
-        next_state_batch = normalize(tf.Variable(transitions.sp, dtype=tf.float32), self.obs_rms)
+        reward_batch = normalize(transitions.r, self.ret_rms)
+        next_state_batch = normalize(transitions.sp, self.obs_rms)
         terminal_mask = transitions.it
         # transitions is sampled from replay buffer
         self.critics.train(
