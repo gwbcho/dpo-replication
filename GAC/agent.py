@@ -272,7 +272,7 @@ class GACAgent:
         """
         self.replay.store(state, action, reward, next_state, is_done)
         if self.normalize_observations:
-            self.obs_rms.update(state.numpy())
+            self.obs_rms.update(state)
         if self.normalize_rewards:
             self.ret = self.ret * self.gamma + reward
             self.ret_rms.update(np.array([self.ret]))
