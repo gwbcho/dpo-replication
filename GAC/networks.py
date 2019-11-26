@@ -398,6 +398,7 @@ class Critic(tf.Module):
             actions
             rewards
             next_states
+            terminal_mask
             transitions
             value
             gamma
@@ -411,7 +412,7 @@ class Critic(tf.Module):
         noisy_actions = actions + noise
         action_batch = tf.clip_by_value(noisy_actions, -1, 1)
         # Line 10 of Algorithm 2
-        yQ = rewards + gamma * value(next_states) * (1-terminal_mask)
+        yQ = rewards + gamma * value(next_states) * (1 - terminal_mask)
         # Line 11-12 of Algorithm 2
         x = tf.concat([states, action_batch], -1)
         with tf.GradientTape() as tape1:
