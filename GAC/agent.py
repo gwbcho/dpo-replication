@@ -39,15 +39,20 @@ class GACAgent:
                     batch_size (int): batch size
                     q_normalization (float): q value normalization rate
                     gamma (float): value used in critic training
-                    normalize_obs(boolean): boolean to indicate that you want to normalize
+                    normalize_obs (boolean): boolean to indicate that you want to normalize
                         observations
+                    normalize_rewards (boolean): boolean to indicate that you want to normalize
+                        return values (usually done for numerical stability)
         """
         self.args = args
         self.action_dim = args.action_dim
         self.state_dim = args.state_dim
+        self.gamma = args.gamma
+
+        # normalization
         self.normalize_observations = args.normalize_obs
         self.q_normalization = args.q_normalization
-        self.gamma = args.gamma
+        self.normalize_rewards = args.normalize_rewards
 
         if args.actor == 'IQN':
             self.actor = StochasticActor(args.state_dim, args.action_dim)
@@ -62,6 +67,13 @@ class GACAgent:
             self.obs_rms = RunningMeanStd(shape=self.state_dim)
         else:
             self.obs_rms = None
+
+        if self.normalize_rewards:
+            self.ret_rms = RunningMeanStd(shape=1)
+            self.ret = 0
+            self.clip_rew = 10
+        else:
+            self.ret_rms = None
 
         # initialize trainable variables
         self.actor(
@@ -114,16 +126,30 @@ class GACAgent:
         """
         # transitions is sampled from replay buffer
         transitions = self.replay.sample_batch(self.args.batch_size)
+        state_batch = normalize(transitions.s, self.obs_rms)
+        action_batch = transitions.a
+        reward_batch = normalize(transitions.r, self.ret_rms)
+        next_state_batch = normalize(transitions.sp, self.obs_rms)
+        terminal_mask = transitions.it
         # transitions is sampled from replay buffer
-        self.critics.train(transitions, self.target_value, self.args.gamma, self.q_normalization)
+        self.critics.train(
+            state_batch,
+            action_batch,
+            reward_batch,
+            next_state_batch,
+            terminal_mask,
+            self.target_value,
+            self.args.gamma,
+            self.q_normalization
+        )
         self.value.train(
-            transitions,
+            state_batch,
             self.target_actor,
             self.target_critics,
             self.args.action_samples
         )
         # note that transitions.s represents the sampled states from the memory buffer
-        states, actions, advantages = self._sample_positive_advantage_actions(transitions.s)
+        states, actions, advantages = self._sample_positive_advantage_actions(state_batch)
         if advantages.shape[0]:
             self.actor.train(
                 states,
@@ -233,15 +259,22 @@ class GACAgent:
         for variable in params:
             variable.assign(variable + tf.random.normal(param.shape) * param_noise.current_stddev)
 
-    def store_transitions(self, state, action, reward, next_state, is_done):
+    def store_transition(self, state, action, reward, next_state, is_done):
         """
-        Store the transition in the replay buffer.
+        Store the transition in the replay buffer with normalizing, should it be specified.
 
         Args:
             state (tf.Variable): (batch_size, state_size) state vector
             action (tf.Variable): (batch_size, action_size) action vector
-            reward (float): reward value determined by the environment
+            reward (float): reward value determined by the environment (batch_size, 1)
             next_state (tf.Variable): (batch_size, state_size) next state vector
             is_done (boolean): value to indicate that the state is terminal
         """
         self.replay.store(state, action, reward, next_state, is_done)
+        if self.normalize_observations:
+            self.obs_rms.update(state)
+        if self.normalize_rewards:
+            self.ret = self.ret * self.gamma + reward
+            self.ret_rms.update(np.array([self.ret]))
+            if is_done:
+                self.ret = 0
