@@ -173,7 +173,7 @@ def main():
     base_dir = base_dir + str(run_number)
     os.makedirs(base_dir)
 
-    gac = GACAgent(args)
+    gac = GACAgent(**args.__dict__)
     state = env.reset()
     results_dict = {
         'train_rewards': [],
