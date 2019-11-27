@@ -179,7 +179,7 @@ class GACAgent:
         """
         # tile states to be of dimension (batch_size * K, state_dim)
         tiled_states = tf.tile(states, [self.args.action_samples, 1])
-        # Sample actions with noise for exploration
+        # Sample actions with noise for normalization
         target_actions = self.action_sampler.get_actions(self.target_actor, tiled_states)
         target_actions += tf.random.normal(target_actions.shape) * 0.01
         target_actions = tf.clip_by_value(target_actions, -1, 1)
