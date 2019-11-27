@@ -36,7 +36,7 @@ class GACAgent:
                 actions should be sampled from the memory buffer
             mode (string): poorly named variable to represent variable being used in the
                 distribution being used
-            beta (float): value used in blotzman distribution
+            beta (float): value used in boltzmann distribution
             tau (float): update rate parameter
             batch_size (int): batch size
             q_normalization (float): q value normalization rate
