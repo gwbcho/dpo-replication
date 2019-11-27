@@ -406,7 +406,7 @@ class Critic(tf.Module):
         Returns:
             critic history tuple (two histories for the two critic models in general)
         """
-        # Add tau random noise sampler for Q value normalization
+        # Add tau random noise sampler for Q value regularization
         batch_size = states.shape[0]
         noise = (tf.random.uniform((batch_size, self.action_dim), 0, 1) * 2 - 1) * q_normalization
         noisy_actions = actions + noise
