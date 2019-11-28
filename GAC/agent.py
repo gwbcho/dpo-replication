@@ -21,47 +21,58 @@ class GACAgent:
     Action is alway from -1 to 1 in each dimension.
     Will not do normalization.
     """
-    def __init__(self, args):
+    def __init__(self, action_dim, state_dim, buffer_size=1000000, action_samples=10,
+                 mode='linear', beta=1, tau=5e-3, q_normalization=0.01, gamma=0.99,
+                 normalize_obs=False, normalize_rewards=False, batch_size=64, actor='AIQN',
+                 *args, **kwargs):
         """
         Agent class to generate a stochastic policy.
 
         Args:
-            args (class):
-                Attributes:
-                    action_dim (int): action dimension
-                    state_dim (int): state dimension
-                    buffer_size (int): how much memory is allocated to the ReplayMemoryClass
-                    action_samples (int): originally labelled K in the paper, represents how many
-                        actions should be sampled from the memory buffer
-                    mode (string): poorly named variable to represent variable being used in the
-                        distribution being used
-                    beta (float): value used in blotzman distribution
-                    batch_size (int): batch size
-                    q_normalization (float): q value normalization rate
-                    gamma (float): value used in critic training
-                    normalize_obs (boolean): boolean to indicate that you want to normalize
-                        observations
-                    normalize_rewards (boolean): boolean to indicate that you want to normalize
-                        return values (usually done for numerical stability)
+            action_dim (int): action dimension
+            state_dim (int): state dimension
+            buffer_size (int): how much memory is allocated to the ReplayMemoryClass
+            action_samples (int): originally labelled K in the paper, represents how many
+                actions should be sampled from the memory buffer
+            mode (string): poorly named variable to represent variable being used in the
+                distribution being used
+            beta (float): value used in boltzmann distribution
+            tau (float): update rate parameter
+            batch_size (int): batch size
+            q_normalization (float): q value normalization rate
+            gamma (float): value used in critic training
+            normalize_obs (boolean): boolean to indicate that you want to normalize
+                observations
+            normalize_rewards (boolean): boolean to indicate that you want to normalize
+                return values (usually done for numerical stability)
+            actor (string): string indicating the type of actor to use
         """
-        self.args = args
-        self.action_dim = args.action_dim
-        self.state_dim = args.state_dim
-        self.gamma = args.gamma
+        self.action_dim = action_dim
+        self.state_dim = state_dim
+        self.buffer_size = buffer_size
+        self.gamma = gamma
+        self.action_samples = action_samples
+        self.mode = mode
+        self.beta = beta
+        self.tau = tau
+        self.batch_size = batch_size
 
         # normalization
-        self.normalize_observations = args.normalize_obs
-        self.q_normalization = args.q_normalization
-        self.normalize_rewards = args.normalize_rewards
+        self.normalize_observations = normalize_obs
+        self.q_normalization = q_normalization
+        self.normalize_rewards = normalize_rewards
 
-        if args.actor == 'IQN':
-            self.actor = StochasticActor(args.state_dim, args.action_dim)
-            self.target_actor = StochasticActor(args.state_dim, args.action_dim)
-            self.actor_perturbed = StochasticActor(args.state_dim, args.action_dim)
-        elif args.actor == 'AIQN':
-            self.actor = AutoRegressiveStochasticActor(args.state_dim, args.action_dim)
-            self.target_actor = AutoRegressiveStochasticActor(args.state_dim, args.action_dim)
-            self.actor_perturbed = AutoRegressiveStochasticActor(args.state_dim, args.action_dim)
+        # type of actor being used
+        self.actor = actor
+
+        if self.actor == 'IQN':
+            self.actor = StochasticActor(self.state_dim, self.action_dim)
+            self.target_actor = StochasticActor(self.state_dim, self.action_dim)
+            self.actor_perturbed = StochasticActor(self.state_dim, self.action_dim)
+        elif self.actor == 'AIQN':
+            self.actor = AutoRegressiveStochasticActor(self.state_dim, self.action_dim)
+            self.target_actor = AutoRegressiveStochasticActor(self.state_dim, self.action_dim)
+            self.actor_perturbed = AutoRegressiveStochasticActor(self.state_dim, self.action_dim)
 
         if self.normalize_observations:
             self.obs_rms = RunningMeanStd(shape=self.state_dim)
@@ -77,40 +88,40 @@ class GACAgent:
 
         # initialize trainable variables
         self.actor(
-            tf.zeros([args.batch_size, args.state_dim]),
-            tf.zeros([args.batch_size, args.action_dim])
+            tf.zeros([self.batch_size, self.state_dim]),
+            tf.zeros([self.batch_size, self.action_dim])
         )
         self.target_actor(
-            tf.zeros([args.batch_size, args.state_dim]),
-            tf.zeros([args.batch_size, args.action_dim])
+            tf.zeros([self.batch_size, self.state_dim]),
+            tf.zeros([self.batch_size, self.action_dim])
         )
 
-        self.critics = Critic(args.state_dim, args.action_dim)
-        self.target_critics = Critic(args.state_dim, args.action_dim)
+        self.critics = Critic(self.state_dim, self.action_dim)
+        self.target_critics = Critic(self.state_dim, self.action_dim)
 
         # initialize trainable variables for critics
         self.critics(
-            tf.zeros([args.batch_size, args.state_dim]),
-            tf.zeros([args.batch_size, args.action_dim])
+            tf.zeros([self.batch_size, self.state_dim]),
+            tf.zeros([self.batch_size, self.action_dim])
         )
         self.target_critics(
-            tf.zeros([args.batch_size, args.state_dim]),
-            tf.zeros([args.batch_size, args.action_dim])
+            tf.zeros([self.batch_size, self.state_dim]),
+            tf.zeros([self.batch_size, self.action_dim])
         )
 
-        self.value = Value(args.state_dim)
-        self.target_value = Value(args.state_dim)
+        self.value = Value(self.state_dim)
+        self.target_value = Value(self.state_dim)
 
         # initialize value training variables
-        self.value(tf.zeros([args.batch_size, args.state_dim]))
-        self.value(tf.zeros([args.batch_size, args.state_dim]))
+        self.value(tf.zeros([self.batch_size, self.state_dim]))
+        self.value(tf.zeros([self.batch_size, self.state_dim]))
 
         # initialize the target networks.
         update(self.target_actor, self.actor, 1.0)
         update(self.target_critics, self.critics, 1.0)
         update(self.target_value, self.value, 1.0)
 
-        self.replay = ReplayBuffer(args.state_dim, args.action_dim, args.buffer_size)
+        self.replay = ReplayBuffer(self.state_dim, self.action_dim, self.buffer_size)
         self.action_sampler = ActionSampler(self.actor.action_dim)
 
     def train_one_step(self):
@@ -125,7 +136,7 @@ class GACAgent:
             None
         """
         # transitions is sampled from replay buffer
-        transitions = self.replay.sample_batch(self.args.batch_size)
+        transitions = self.replay.sample_batch(self.batch_size)
         state_batch = normalize(transitions.s, self.obs_rms)
         action_batch = transitions.a
         reward_batch = normalize(transitions.r, self.ret_rms)
@@ -139,14 +150,14 @@ class GACAgent:
             next_state_batch,
             terminal_mask,
             self.target_value,
-            self.args.gamma,
+            self.gamma,
             self.q_normalization
         )
         self.value.train(
             state_batch,
             self.target_actor,
             self.target_critics,
-            self.args.action_samples
+            self.action_samples
         )
         # note that transitions.s represents the sampled states from the memory buffer
         states, actions, advantages = self._sample_positive_advantage_actions(state_batch)
@@ -155,12 +166,12 @@ class GACAgent:
                 states,
                 actions,
                 advantages,
-                self.args.mode,
-                self.args.beta
+                self.mode,
+                self.beta
             )
-        update(self.target_actor, self.actor, self.args.tau)
-        update(self.target_critics, self.critics, self.args.tau)
-        update(self.target_value, self.value, self.args.tau)
+        update(self.target_actor, self.actor, self.tau)
+        update(self.target_critics, self.critics, self.tau)
+        update(self.target_value, self.value, self.tau)
 
     def _sample_positive_advantage_actions(self, states):
         """
@@ -178,8 +189,8 @@ class GACAgent:
             advantages (list[float]): set of positive advantage values (Q - V)
         """
         # tile states to be of dimension (batch_size * K, state_dim)
-        tiled_states = tf.tile(states, [self.args.action_samples, 1])
-        # Sample actions with noise for exploration
+        tiled_states = tf.tile(states, [self.action_samples, 1])
+        # Sample actions with noise for normalization
         target_actions = self.action_sampler.get_actions(self.target_actor, tiled_states)
         target_actions += tf.random.normal(target_actions.shape) * 0.01
         target_actions = tf.clip_by_value(target_actions, -1, 1)
