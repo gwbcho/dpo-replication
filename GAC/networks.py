@@ -193,7 +193,7 @@ class AutoRegressiveStochasticActor(IQNActor):
             return self._supervised_forward(state, taus, supervise_actions)
         batch_size = state.shape[0]
         # batch x 1 x 400
-        state_embedding = tf.expand_dims(self.state_embedding(state), 1)
+        state_embedding = tf.expand_dims(tf.nn.leaky_relu(self.state_embedding(state)), 1)
         # batch x action dim x 400
         noise_embedding = self.noise_embedding(taus)
 
@@ -406,7 +406,7 @@ class Critic(tf.Module):
         Returns:
             critic history tuple (two histories for the two critic models in general)
         """
-        # Add tau random noise sampler for Q value normalization
+        # Add tau random noise sampler for Q value regularization
         batch_size = states.shape[0]
         noise = (tf.random.uniform((batch_size, self.action_dim), 0, 1) * 2 - 1) * q_normalization
         noisy_actions = actions + noise

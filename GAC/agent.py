@@ -82,7 +82,6 @@ class GACAgent:
         if self.normalize_rewards:
             self.ret_rms = RunningMeanStd(shape=1)
             self.ret = 0
-            self.clip_rew = 10
         else:
             self.ret_rms = None
 
@@ -190,7 +189,7 @@ class GACAgent:
         """
         # tile states to be of dimension (batch_size * K, state_dim)
         tiled_states = tf.tile(states, [self.action_samples, 1])
-        # Sample actions with noise for normalization
+        # Sample actions with noise for regularization
         target_actions = self.action_sampler.get_actions(self.target_actor, tiled_states)
         target_actions += tf.random.normal(target_actions.shape) * 0.01
         target_actions = tf.clip_by_value(target_actions, -1, 1)
