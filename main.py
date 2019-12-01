@@ -9,7 +9,6 @@ from tqdm import trange
 
 import utils.utils as utils
 from noises.ounoise import NormalActionNoise, OrnsteinUhlenbeckActionNoise
-from noises.param_noise import AdaptiveParamNoiseSpec, ddpg_distance_metric
 from environment.wapper import Wrapper
 from GAC.networks import AutoRegressiveStochasticActor as AIQN
 from GAC.networks import StochasticActor as IQN
@@ -33,7 +32,7 @@ def create_argument_parser():
         '--tau', type=float, default=5e-3, metavar='G',
         help='discount factor for model (default: 0.005)'
     )
-    parser.add_argument('--noise', default='ou', choices=['ou', 'param', 'normal'])
+    parser.add_argument('--noise', default='normal', choices=['ou', 'normal'])
     parser.add_argument(
         '--noise_scale', type=float, default=0.2, metavar='G',
         help='(default: 0.2)'
@@ -62,7 +61,6 @@ def create_argument_parser():
         '--model_path', type=str, default='/tmp/dpo/',
         help='trained model is saved to this location, default="/tmp/dpo/"'
     )
-    parser.add_argument('--param_noise_interval', type=int, default=50, metavar='N')
     parser.add_argument('--start_timesteps', type=int, default=10000, metavar='N')
     parser.add_argument('--eval_freq', type=int, default=5000, metavar='N')
     parser.add_argument('--eval_episodes', type=int, default=10, metavar='N')
@@ -103,11 +101,9 @@ def create_argument_parser():
     return parser
 
 
-def _reset_noise(agent, a_noise, p_noise):
+def _reset_noise(agent, a_noise):
     if a_noise is not None:
         a_noise.reset()
-    if p_noise is not None:
-        agent.perturb_actor_parameters(p_noise)
 
 
 def evaluate_policy(policy, env, episodes):
@@ -157,14 +153,6 @@ def main():
     else:
         noise = None
 
-    if args.noise == 'param':
-        param_noise = AdaptiveParamNoiseSpec(
-            initial_stddev=args.noise_scale,
-            desired_action_stddev=args.noise_scale
-        )
-    else:
-        param_noise = None
-
     base_dir = os.getcwd() + '/models/' + args.environment + '/'
     run_number = 0
     while os.path.exists(base_dir + str(run_number)):
@@ -189,7 +177,7 @@ def main():
     else:
         nb_epochs = 500
 
-    _reset_noise(gac, noise, param_noise)
+    _reset_noise(gac, noise)
     """
     training loop
     """
@@ -209,8 +197,7 @@ def main():
                 else:
                     action = gac.select_perturbed_action(
                         tf.convert_to_tensor([state], dtype=tf.float32),
-                        noise,
-                        param_noise
+                        noise
                     )
                 # remove the batch_size dimension if batch_size == 1
                 action = tf.squeeze(action, [0]).numpy()
@@ -229,7 +216,7 @@ def main():
                     )
                     episode_steps = 0
                     episode_rewards = 0
-                    _reset_noise(gac, noise, param_noise)
+                    _reset_noise(gac, noise)
                 else:
                     state = next_state
                     episode_steps += 1
@@ -252,17 +239,6 @@ def main():
             # train
             if gac.replay.size >= args.batch_size:
                 for _ in range(args.T):
-                    if train_steps % args.param_noise_interval == 0 and param_noise is not None:
-                        episode_transitions = gac.replay.sample_batch(args.batch_size)
-                        states = episode_transitions.s
-                        unperturbed_actions = gac.get_action(states)
-                        perturbed_actions = episode_transitions.a
-                        ddpg_dist = ddpg_distance_metric(
-                            perturbed_actions.numpy(),
-                            unperturbed_actions.numpy()
-                        )
-                        param_noise.adapt(ddpg_dist)
-
                     gac.train_one_step()
                     train_steps += 1
 
