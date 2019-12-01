@@ -239,8 +239,8 @@ class GACAgent:
                 distribution
 
         Returns:
-            action vector of dimension (batch_size, action_dim). Note that if both action noise and
-                param noise are None, this function is the same as get_action.
+            action vector of dimension (batch_size, action_dim). Note that if action noise,
+                this function is the same as get_action.
         """
         state = normalize(tf.Variable(state, dtype=tf.float32), self.obs_rms)
         action = self.action_sampler.get_actions(self.actor, state)
