@@ -6,7 +6,6 @@ import gym
 import numpy as np
 import tensorflow as tf
 from tqdm import trange
-import json
 
 import utils.utils as utils
 from noises.ounoise import NormalActionNoise, OrnsteinUhlenbeckActionNoise

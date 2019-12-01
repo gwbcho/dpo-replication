@@ -18,8 +18,7 @@ Class: Generative Actor Critic (GAC) agent.
 class GACAgent:
     """
     GAC agent.
-    Action is alway from -1 to 1 in each dimension.
-    Will not do normalization.
+    Action is always from -1 to 1 in each dimension.
     """
     def __init__(self, action_dim, state_dim, buffer_size=1000000, action_samples=10,
                  mode='linear', beta=1, tau=5e-3, q_normalization=0.01, gamma=0.99,
