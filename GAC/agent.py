@@ -62,16 +62,12 @@ class GACAgent:
         self.normalize_rewards = normalize_rewards
 
         # type of actor being used
-        self.actor = actor
-
-        if self.actor == 'IQN':
+        if actor == 'IQN':
             self.actor = StochasticActor(self.state_dim, self.action_dim)
             self.target_actor = StochasticActor(self.state_dim, self.action_dim)
-            self.actor_perturbed = StochasticActor(self.state_dim, self.action_dim)
-        elif self.actor == 'AIQN':
+        elif actor == 'AIQN':
             self.actor = AutoRegressiveStochasticActor(self.state_dim, self.action_dim)
             self.target_actor = AutoRegressiveStochasticActor(self.state_dim, self.action_dim)
-            self.actor_perturbed = AutoRegressiveStochasticActor(self.state_dim, self.action_dim)
 
         if self.normalize_observations:
             self.obs_rms = RunningMeanStd(shape=self.state_dim)
@@ -231,7 +227,7 @@ class GACAgent:
         """
         return self.action_sampler.get_actions(self.actor, states)
 
-    def select_perturbed_action(self, state, action_noise=None, param_noise=None):
+    def select_perturbed_action(self, state, action_noise=None):
         """
         Select actions from the perturbed actor using action noise and parameter noise
 
@@ -239,34 +235,17 @@ class GACAgent:
             state (tf.Variable): tf variable containing the state vector
             action_niose (function): action noise function which will construct noise from some
                 distribution
-            param_noise (boolean): boolean indicating that parameter noise is necessary
 
         Returns:
-            action vector of dimension (batch_size, action_dim). Note that if both action noise and
-                param noise are None, this function is the same as get_action.
+            action vector of dimension (batch_size, action_dim). Note that if action noise,
+                this function is the same as get_action.
         """
         state = normalize(tf.Variable(state, dtype=tf.float32), self.obs_rms)
-        if param_noise is not None:
-            action = self.action_sampler.get_actions(self.actor_perturbed, state)
-        else:
-            action = self.action_sampler.get_actions(self.actor, state)
+        action = self.action_sampler.get_actions(self.actor, state)
         if action_noise is not None:
             action += tf.Variable(action_noise(), dtype=tf.float32)
         action = tf.clip_by_value(action, -1, 1)
         return action
-
-    def perturb_actor_parameters(self, param_noise):
-        """
-        Apply parameter noise to actor model, for exploration
-
-        Args:
-            param_noise (AdaptiveParamNoiseSpec): Object containing adaptive parameter noise
-                specifications
-        """
-        update(self.actor_perturbed, self.actor, 1)
-        params = self.actor_perturbed.trainable_variables
-        for variable in params:
-            variable.assign(variable + tf.random.normal(param.shape) * param_noise.current_stddev)
 
     def store_transition(self, state, action, reward, next_state, is_done):
         """
