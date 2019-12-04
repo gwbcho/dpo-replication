@@ -62,12 +62,10 @@ class GACAgent:
         self.normalize_rewards = normalize_rewards
 
         # type of actor being used
-        self.actor = actor
-
-        if self.actor == 'IQN':
+        if actor == 'IQN':
             self.actor = StochasticActor(self.state_dim, self.action_dim)
             self.target_actor = StochasticActor(self.state_dim, self.action_dim)
-        elif self.actor == 'AIQN':
+        elif actor == 'AIQN':
             self.actor = AutoRegressiveStochasticActor(self.state_dim, self.action_dim)
             self.target_actor = AutoRegressiveStochasticActor(self.state_dim, self.action_dim)
 
